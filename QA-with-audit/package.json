@@ -1,0 +1,8 @@
+{
+  "name": "qa-system-with-audit",
+  "version": "4.0.0",
+  "private": true,
+  "dependencies": {
+    "@vercel/blob": "^0.23.4"
+  }
+}
