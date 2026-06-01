@@ -421,7 +421,16 @@ npx clean-css-cli style.css -o style.min.css');
   if (!meta.desc) {
     push('SEO','high','Missing meta description',
       'No meta description tag found on this page.',
-      'Add a meta description (150-160 chars) in Yoast/RankMath → Description field. Or use The SEO Framework or Yoast to set it per page. A good meta description includes the primary keyword and is under 160 characters.',
+      `Add a meta description (150–160 chars) in Yoast/RankMath → Description field.
+// Or add programmatically in functions.php:
+add_action('wp_head', function() {
+  if (is_single() || is_page()) {
+    $desc = get_the_excerpt();
+    if ($desc) {
+      echo '<meta name="description" content="' . esc_attr(wp_trim_words($desc, 25)) . '">';
+    }
+  }
+});`,
       { line:null, selector:'meta[name="description"]', context:'(missing from <head>)', raw:'(missing)' });
   } else if (meta.desc.length < 70) {
     push('SEO','medium',`Meta description too short (${meta.desc.length} chars)`,meta.desc.slice(0,100),
@@ -476,7 +485,13 @@ npx clean-css-cli style.css -o style.min.css');
   if (!meta.canonical) {
     push('SEO','medium','Missing canonical tag',
       'No rel="canonical" link found.',
-      'Canonical prevents duplicate content indexing. Yoast/RankMath add this automatically — verify it is configured. Or add manually: link rel=canonical href=PAGE_URL in your theme head.',
+      `Canonical prevents duplicate content. Yoast/RankMath add this automatically.
+// Or add to functions.php:
+add_action('wp_head', function() {
+  global $wp;
+  $canonical = home_url(add_query_arg([], $wp->request));
+  echo '<link rel="canonical" href="' . esc_url($canonical) . '" />';
+}, 1);`,
       { line:null, selector:'link[rel="canonical"]', context:'(missing from <head>)', raw:'(missing)' });
   } else {
     try {
@@ -626,7 +641,11 @@ npx clean-css-cli style.css -o style.min.css');
       const loc = locate(html, img.raw, 'img');
       push('Images','high',`Broken image (HTTP ${status})`,
         `src="${img.src.split('/').pop()}"`,
-        'Fix the image URL or re-upload the image via WordPress Media Library. Use the Broken Link Checker plugin to find all broken images across the site. Dashboard → Media → locate the image and re-upload or update the source URL.',
+        `Fix the image URL or re-upload via WordPress Media Library.
+// Find broken images in WordPress:
+// Dashboard → Media → filter by "broken" or check with Broken Link Checker plugin
+// Or re-upload the image and update the reference:
+update_post_meta($post_id, '_thumbnail_id', $new_attachment_id);`,
         loc ? {...loc, imageUrl:img.src} : { imageUrl:img.src, selector:`img[src*="${img.src.split('/').pop()}"]` });
     }
   }
@@ -637,7 +656,16 @@ npx clean-css-cli style.css -o style.min.css');
     const loc=locate(html,img.raw,'img');
     push('Accessibility','high','Image missing alt text',
       `src="${img.src.split('/').pop().split('?')[0]}"`,
-      'Add descriptive alt text to each img tag. In WordPress Media Library: click the image → Edit → Alt Text field → save. For bulk fixing: install the Fix Missing Alt Tags plugin or use Yoast SEO which flags missing alt text on each post/page edit screen.',
+      `Add descriptive alt text to the img tag.
+// Bulk fix in WordPress — add to functions.php:
+add_filter('wp_get_attachment_image_attributes', function($attr, $attach) {
+  if (empty($attr['alt'])) {
+    $file = get_attached_file($attach->ID);
+    $name = pathinfo(basename($file), PATHINFO_FILENAME);
+    $attr['alt'] = ucwords(str_replace(['-','_'], ' ', $name));
+  }
+  return $attr;
+}, 10, 2);`,
       loc ? {...loc, imageUrl:img.src} : { imageUrl:img.src, selector:`img[src*="${img.src.split('/').pop()}"]` });
   }
   if (noAlt.length>4)
