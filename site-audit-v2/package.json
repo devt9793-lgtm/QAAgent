@@ -1,0 +1,7 @@
+{
+  "name": "site-audit-agent",
+  "version": "3.0.0",
+  "private": true,
+  "engines": { "node": ">=18" },
+  "dependencies": { "@vercel/blob": "^0.23.4" }
+}
