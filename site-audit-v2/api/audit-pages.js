@@ -7,58 +7,25 @@ export const config = { maxDuration: 55 };
 // ─── FETCH ───────────────────────────────────────────────
 async function fetchPage(url) {
   const start = Date.now();
-  const c = new AbortController();
-  const t = setTimeout(() => c.abort(), 13000);
   try {
+    const c = new AbortController();
+    setTimeout(() => c.abort(), 13000);
     const res = await fetch(url, {
       signal: c.signal, redirect: 'follow',
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SiteAuditBot/3.2)', 'Accept': 'text/html' },
     });
-    // Measure TTFB here — before reading body. Headers arrive with first byte.
-    const ttfb = Date.now() - start;
     const html = await res.text();
-    clearTimeout(t);
-    const hdrs = Object.fromEntries(res.headers);
-    // Detect active caching from server headers
-    const cachedBy = detectCacheHeaders(hdrs);
-    return { ok: true, html, status: res.status, ttfb, finalUrl: res.url, redirected: res.redirected, headers: hdrs, cachedBy };
-  } catch(e) {
-    clearTimeout(t);
-    return { ok: false, error: e.message, status: 0, ttfb: Date.now()-start };
-  }
-}
-
-// Detects which caching layer is active from response headers
-// Prevents false-positive "no cache" issues on cached pages
-function detectCacheHeaders(h) {
-  const ls  = (h['x-litespeed-cache']||'').toLowerCase();
-  const cf  = (h['cf-cache-status']||'').toLowerCase();
-  const xc  = (h['x-cache']||h['x-cache-status']||'').toLowerCase();
-  const xp  = (h['x-proxy-cache']||'').toLowerCase();
-  const age = parseInt(h['age']||'0');
-  const cc  = h['cache-control']||h['Cache-Control']||'';
-  const maxAgeM = cc.match(/max-age=(\d+)/i);
-  const maxAge  = maxAgeM ? parseInt(maxAgeM[1]) : 0;
-
-  if (/hit/.test(ls))                    return 'litespeed';
-  if (/hit/.test(cf))                    return 'cloudflare';
-  if (/hit/.test(xc) || /hit/.test(xp)) return 'server-cache';
-  if (age > 0)                           return 'cdn-age';
-  if (maxAge > 3600 && cc.includes('public')) return 'browser-cache';
-  return null; // genuinely not cached
+    return { ok: true, html, status: res.status, ttfb: Date.now()-start, finalUrl: res.url, redirected: res.redirected, headers: Object.fromEntries(res.headers) };
+  } catch(e) { return { ok: false, error: e.message, status: 0, ttfb: Date.now()-start }; }
 }
 
 async function headReq(url) {
-  const c = new AbortController();
-  const t = setTimeout(() => c.abort(), 7000);
   try {
+    const c = new AbortController();
+    setTimeout(() => c.abort(), 7000);
     const res = await fetch(url, { method:'HEAD', signal: c.signal, redirect:'follow' });
-    clearTimeout(t);
     return { status: res.status, size: parseInt(res.headers.get('content-length')||'0'), type: res.headers.get('content-type')||'', finalUrl: res.url };
-  } catch {
-    clearTimeout(t);
-    return { status: 0, size: 0, type: '', finalUrl: url };
-  }
+  } catch { return { status: 0, size: 0, type: '', finalUrl: url }; }
 }
 
 // Count redirect hops
@@ -67,17 +34,14 @@ async function countRedirects(url) {
   try {
     for (let i = 0; i < 6; i++) {
       const c = new AbortController();
-      const t = setTimeout(() => c.abort(), 5000);
-      try {
-        const res = await fetch(current, { method:'HEAD', signal:c.signal, redirect:'manual' });
-        clearTimeout(t);
-        if (res.status >= 300 && res.status < 400) {
-          hops++;
-          const loc = res.headers.get('location');
-          if (!loc) break;
-          current = new URL(loc, current).href;
-        } else break;
-      } catch { clearTimeout(t); break; }
+      setTimeout(() => c.abort(), 5000);
+      const res = await fetch(current, { method:'HEAD', signal:c.signal, redirect:'manual' });
+      if (res.status >= 300 && res.status < 400) {
+        hops++;
+        const loc = res.headers.get('location');
+        if (!loc) break;
+        current = new URL(loc, current).href;
+      } else break;
     }
   } catch {}
   return hops;
@@ -235,7 +199,7 @@ const WATERMARK_DOMAINS = [
 ];
 
 // ─── MAIN AUDIT ──────────────────────────────────────────
-async function auditPage(url, html, status, ttfb, headers, imgData, siteBaseUrl, isHomepage, cachedBy) {
+async function auditPage(url, html, status, ttfb, headers, imgData, siteBaseUrl, isHomepage) {
   const issues = [];
   const push = (group, sev, title, detail, fix, loc=null) =>
     issues.push({ group, severity:sev, title, detail, fix, location:loc });
@@ -296,50 +260,28 @@ async function auditPage(url, html, status, ttfb, headers, imgData, siteBaseUrl,
   if (ttfb > 1800)
     push('Performance','critical',`TTFB ${ttfb}ms — page not being served from cache`,
       `Time to First Byte: ${ttfb}ms. Every visitor gets a full PHP database render. Target: under 200ms.`,
-      'Enable page caching in your cache plugin (WP Rocket, W3 Total Cache, WP Super Cache, or your host's built-in caching). Enable mobile caching separately. Verify caching is active by checking for a cache comment at the bottom of the HTML source.');
+      'Install LiteSpeed Cache or WP Rocket. Enable page cache + mobile cache. Check cache is working by viewing source and looking for cache comment at bottom of HTML.');
   else if (ttfb > 800)
     push('Performance','high',`TTFB ${ttfb}ms — above Google threshold`,
       `Google "Good" is under 800ms.`,
       'Enable caching plugin. Check server resources. Consider Cloudflare free tier for edge caching.');
 
-  // ── CACHE CHECK: Use detectCacheHeaders result from fetchPage ──────
-  // cachedBy is passed from the batch handler via fetchPage.cachedBy
-  // This prevents false positives on LiteSpeed/Cloudflare/nginx cached pages
-  const cc       = headers['cache-control'] || headers['Cache-Control'] || '';
-  const maxAgeM  = cc.match(/max-age=(\d+)/i);
-  const maxAge   = maxAgeM ? parseInt(maxAgeM[1]) : 0;
-  const isCached = !!(cachedBy); // truthy = a cache layer is active
-  const hasNoStore = cc.includes('no-store');
-
-  // Only flag if genuinely uncached (no server-side cache AND no long browser TTL)
-  if (!isCached && hasNoStore) {
-    push('Performance','medium','Cache-Control is set to no-store',
-      `Cache-Control: "${cc}" — browsers cannot cache this page at all.`,
-      `Remove no-store directive. Add to .htaccess:
-<IfModule mod_expires.c>
-  ExpiresActive On
-  ExpiresByType text/html "access plus 1 hour"
-  ExpiresByType text/css "access plus 1 year"
-  ExpiresByType application/javascript "access plus 1 year"
-</IfModule>`);
-  } else if (!isCached && !cc && ttfb > 500) {
-    push('Performance','medium','No cache headers detected — page may not be cached',
-      `No Cache-Control header and TTFB is ${ttfb}ms. Cache plugin may not be active.`,
-      `Enable page caching in your cache plugin. Or add to .htaccess:
-Header set Cache-Control "public, max-age=604800"
-# Verify caching is working by checking response headers for x-cache: HIT or similar.`);
-  }
+  const cc = headers['cache-control']||headers['Cache-Control']||'';
+  if (!cc || cc.includes('no-store'))
+    push('Performance','high','No browser cache headers on page',
+      `Cache-Control: "${cc||'missing'}"`,
+      'LiteSpeed Cache → Cache → Browser Cache TTL → 31557600 (1 year). Or add in .htaccess: Header set Cache-Control "max-age=31536000, public"');
 
   // ── RULE 5: Minified & non-blocking JS/CSS ─────────────
   const blockCSS = styles.filter(s => !s.media || s.media==='all' || s.media==='screen');
   if (blockCSS.length > 8) {
     push('Performance','critical',`${blockCSS.length} render-blocking CSS files`,
       blockCSS.slice(0,3).map(s=>s.href.split('/').pop()).join(', ')+'…',
-      'Enable CSS minification and combining in your cache plugin. In Elementor: Settings → Experiments → Improved CSS Loading. For Critical CSS inline generation use Autoptimize or your host's performance tools.');
+      'Elementor: Settings → Experiments → Improved CSS Loading. LiteSpeed Cache: CSS Minify + Combine ON. Use QUIC.cloud for Critical CSS generation.');
   } else if (blockCSS.length > 4) {
     push('Performance','high',`${blockCSS.length} render-blocking CSS files`,
       blockCSS.slice(0,3).map(s=>s.href.split('/').pop()).join(', '),
-      'Enable CSS Combine and Minify in your cache plugin's Page Optimization settings (WP Rocket → File Optimization → CSS; W3TC → Minify → CSS).');
+      'LiteSpeed Cache → Page Optimization → CSS Combine ON + CSS Minify ON.');
   }
   const headHtml = html.split('</head>')[0]||'';
   const syncHead = parseScripts(headHtml).filter(s=>s.src&&!s.defer&&!s.async);
@@ -348,15 +290,7 @@ Header set Cache-Control "public, max-age=604800"
     const idx   = html.indexOf(first.src) - 8;
     push('Performance','critical',`${syncHead.length} synchronous script(s) blocking page render`,
       syncHead.slice(0,3).map(s=>s.src.split('/').pop()).join(', '),
-      'Add defer attribute to non-critical scripts. Enable JS Defer in your cache plugin (WP Rocket → File Optimization → JavaScript; W3TC → Minify → JS). Exclude from defer: jquery.min.js, elementor-frontend.min.js. Or add defer manually:
-// In functions.php:
-add_filter('script_loader_tag', function($tag, $handle) {
-  $defer = ['your-script-handle'];
-  if (in_array($handle, $defer)) {
-    return str_replace(' src', ' defer src', $tag);
-  }
-  return $tag;
-}, 10, 2);',
+      'Add defer attribute to non-critical scripts. LiteSpeed Cache → Page Optimization → JS Defer → ON. Exclude: jquery.min.js, elementor-frontend.min.js from defer list.',
       idx>=0 ? { line:lineNo(html,idx), selector:`script[src*="${first.src.split('/').pop()}"]`, context:context(html,idx,80), raw:`<script src="${first.src}">` } : null);
   }
   // Unminified JS/CSS detection by filename
@@ -365,14 +299,11 @@ add_filter('script_loader_tag', function($tag, $handle) {
   if (unminJS.length > 3)
     push('Performance','medium',`${unminJS.length} non-minified JavaScript files`,
       unminJS.slice(0,3).map(s=>s.src.split('/').pop()).join(', '),
-      'Enable JS Minify in your cache plugin (WP Rocket → File Optimization; W3TC → Minify). Or minify at build time with:
-npm install terser -g
-terser your-script.js -o your-script.min.js');
+      'Enable JS Minify in LiteSpeed Cache → Page Optimization → JS Minify → ON. Or use a build tool (webpack, Vite) to minify before deployment.');
   if (unminCSS.length > 3)
     push('Performance','medium',`${unminCSS.length} non-minified CSS files`,
       unminCSS.slice(0,3).map(s=>s.href.split('/').pop()).join(', '),
-      'Enable CSS Minify in your cache plugin settings. Or minify manually with:
-npx clean-css-cli style.css -o style.min.css');
+      'Enable CSS Minify in LiteSpeed Cache → Page Optimization → CSS Minify → ON.');
 
   // ── RULE 6: No unnecessary duplication ─────────────────
   // Duplicate title check — only possible via cross-page analysis (done in summary)
@@ -397,13 +328,7 @@ npx clean-css-cli style.css -o style.min.css');
   if (!meta.title) {
     push('SEO','critical','Missing page title',
       'No <title> tag found on this page.',
-      `Add a unique 50-60 char title. In Yoast/RankMath: edit page → SEO Title field.
-// Or in WordPress theme (header.php):
-<title><?php
-  if (is_singular()) { echo get_the_title() . ' - ' . get_bloginfo('name'); }
-  elseif (is_home())  { echo get_bloginfo('description') . ' | ' . get_bloginfo('name'); }
-  else                { wp_title('|', true, 'right'); bloginfo('name'); }
-?></title>`,
+      'Add a unique 50–60 character title. In Yoast/RankMath: edit the page → SEO Title field.',
       { line:1, selector:'head > title', context:'(missing from <head>)', raw:'(missing)' });
   } else if (meta.title.length < 30) {
     const idx=html.indexOf('<title');
@@ -421,16 +346,7 @@ npx clean-css-cli style.css -o style.min.css');
   if (!meta.desc) {
     push('SEO','high','Missing meta description',
       'No meta description tag found on this page.',
-      `Add a meta description (150–160 chars) in Yoast/RankMath → Description field.
-// Or add programmatically in functions.php:
-add_action('wp_head', function() {
-  if (is_single() || is_page()) {
-    $desc = get_the_excerpt();
-    if ($desc) {
-      echo '<meta name="description" content="' . esc_attr(wp_trim_words($desc, 25)) . '">';
-    }
-  }
-});`,
+      'Add a 150–160 character meta description in Yoast/RankMath → Description field. Include the primary keyword naturally.',
       { line:null, selector:'meta[name="description"]', context:'(missing from <head>)', raw:'(missing)' });
   } else if (meta.desc.length < 70) {
     push('SEO','medium',`Meta description too short (${meta.desc.length} chars)`,meta.desc.slice(0,100),
@@ -485,13 +401,7 @@ add_action('wp_head', function() {
   if (!meta.canonical) {
     push('SEO','medium','Missing canonical tag',
       'No rel="canonical" link found.',
-      `Canonical prevents duplicate content. Yoast/RankMath add this automatically.
-// Or add to functions.php:
-add_action('wp_head', function() {
-  global $wp;
-  $canonical = home_url(add_query_arg([], $wp->request));
-  echo '<link rel="canonical" href="' . esc_url($canonical) . '" />';
-}, 1);`,
+      'Canonical prevents duplicate content indexing. Yoast/RankMath add this automatically — verify it is configured. Or manually add: <link rel="canonical" href="PAGE_URL">',
       { line:null, selector:'link[rel="canonical"]', context:'(missing from <head>)', raw:'(missing)' });
   } else {
     try {
@@ -523,13 +433,7 @@ add_action('wp_head', function() {
     const idx=html.search(/name=["']robots["'][^>]*content=["'][^"']*noindex/i);
     push('SEO','critical','Page is set to noindex — invisible to Google',
       `meta robots: "${meta.robots}"`,
-      `Remove noindex from this page:
-1. Yoast SEO → Edit page → SEO tab → Robots → set to "Index"
-2. RankMath → Edit page → Advanced → Robots → uncheck "No Index"
-3. WordPress Settings → Reading → uncheck "Discourage search engines"
-// Check programmatically:
-// WP-CLI: wp post list --post_status=publish --fields=ID,post_title
-// Then verify each page's Yoast meta_robots setting.`,
+      'Remove noindex: WordPress → Settings → Reading → uncheck "Discourage search engines". Or Yoast/RankMath → edit page → Robots → set to Index.',
       idx>=0 ? { line:lineNo(html,idx), selector:'meta[name="robots"]', context:context(html,idx,80), raw:`<meta name="robots" content="${meta.robots}">` } : null);
   }
   if (html.includes('name="robots"') && /nofollow/i.test(meta.robots||''))
@@ -599,55 +503,32 @@ add_action('wp_head', function() {
   }
 
   // ── RULE 20: Images — broken, sizes, lazy, watermarks ──
-  // FIX: Deduplicate image URLs to prevent double-counting same image
-  // FIX: Run broken image checks in parallel with Promise.all for consistency
-  const seenImgUrls = new Set();
-  const uniqueImages = images.filter(img => {
-    if (!img.src || img.src.startsWith('data:')) return false;
-    if (seenImgUrls.has(img.src)) return false;
-    seenImgUrls.add(img.src);
-    return true;
-  });
+  for (const img of images) {
+    if (!img.src || img.src.startsWith('data:')) continue;
 
-  // Watermark check (no network, instant — always consistent)
-  for (const img of uniqueImages) {
+    // Broken images
+    try {
+      const iR = await headReq(img.src);
+      if (iR.status===404||iR.status===0) {
+        const loc=locate(html,img.raw,'img');
+        push('Images','high',`Broken image (${iR.status||'cannot load'})`,
+          `src="${img.src.split('/').pop()}"`,
+          'Fix the image URL or re-upload the image. Check the Media Library for missing attachments.',
+          loc ? {...loc, imageUrl:img.src} : { imageUrl:img.src, selector:`img[src*="${img.src.split('/').pop()}"]` });
+      }
+    } catch {}
+
+    // Watermark / stock image domains
     try {
       const imgHost = new URL(img.src).hostname;
-      if (WATERMARK_DOMAINS.some(d => imgHost.includes(d))) {
-        const loc = locate(html, img.raw, 'img');
+      if (WATERMARK_DOMAINS.some(d=>imgHost.includes(d))) {
+        const loc=locate(html,img.raw,'img');
         push('Images','critical',`Watermarked/stock image from ${imgHost}`,
           `src="${img.src.slice(0,80)}"`,
-          `Purchase a license or replace with a properly owned image.
-// To find all stock images in WordPress:
-// Admin → Media Library → search for the stock site domain name
-// Replace with licensed or self-owned images before launch.`,
+          'Purchase a license for this image or replace with a properly licensed/owned image. Watermarked images on a live site are a legal issue.',
           loc ? {...loc, imageUrl:img.src} : { imageUrl:img.src, selector:`img[src*="${imgHost}"]` });
       }
     } catch {}
-  }
-
-  // Broken image check — parallel with a hard 5s timeout cap per image
-  // Using Promise.allSettled so one timeout doesn't block others
-  const brokenChecks = await Promise.allSettled(
-    uniqueImages.slice(0, 15).map(async img => {
-      const iR = await headReq(img.src);
-      return { img, status: iR.status };
-    })
-  );
-  for (const result of brokenChecks) {
-    if (result.status !== 'fulfilled') continue;
-    const { img, status } = result.value;
-    if (status === 404 || status === 410) {
-      const loc = locate(html, img.raw, 'img');
-      push('Images','high',`Broken image (HTTP ${status})`,
-        `src="${img.src.split('/').pop()}"`,
-        `Fix the image URL or re-upload via WordPress Media Library.
-// Find broken images in WordPress:
-// Dashboard → Media → filter by "broken" or check with Broken Link Checker plugin
-// Or re-upload the image and update the reference:
-update_post_meta($post_id, '_thumbnail_id', $new_attachment_id);`,
-        loc ? {...loc, imageUrl:img.src} : { imageUrl:img.src, selector:`img[src*="${img.src.split('/').pop()}"]` });
-    }
   }
 
   // Missing alt text
@@ -656,16 +537,7 @@ update_post_meta($post_id, '_thumbnail_id', $new_attachment_id);`,
     const loc=locate(html,img.raw,'img');
     push('Accessibility','high','Image missing alt text',
       `src="${img.src.split('/').pop().split('?')[0]}"`,
-      `Add descriptive alt text to the img tag.
-// Bulk fix in WordPress — add to functions.php:
-add_filter('wp_get_attachment_image_attributes', function($attr, $attach) {
-  if (empty($attr['alt'])) {
-    $file = get_attached_file($attach->ID);
-    $name = pathinfo(basename($file), PATHINFO_FILENAME);
-    $attr['alt'] = ucwords(str_replace(['-','_'], ' ', $name));
-  }
-  return $attr;
-}, 10, 2);`,
+      'Add descriptive alt text to the img tag. In WordPress Media Library: click image → Edit → Alt Text field. Or use "Fix Missing Alt Tags" plugin.',
       loc ? {...loc, imageUrl:img.src} : { imageUrl:img.src, selector:`img[src*="${img.src.split('/').pop()}"]` });
   }
   if (noAlt.length>4)
@@ -679,13 +551,7 @@ add_filter('wp_get_attachment_image_attributes', function($attr, $attach) {
   if (noLazy.length>3)
     push('Images','high',`${noLazy.length} images without lazy loading`,
       'Below-fold images load immediately competing with critical content.',
-      'Enable lazy loading for images. Add loading="lazy" to all below-fold img tags:
-// In functions.php:
-add_filter('wp_get_attachment_image_attributes', function($attr) {
-  if (!isset($attr['loading'])) $attr['loading'] = 'lazy';
-  return $attr;
-});
-// Hero image should use loading="eager" or fetchpriority="high" instead.');
+      'LiteSpeed Cache → Image Optimization → Lazy Load Images → ON. Hero/first image should NOT have lazy load.');
 
   // Missing dimensions → CLS
   const noDim = images.filter(i=>i.src&&!i.src.startsWith('data:')&&(!i.w||!i.h));
@@ -708,27 +574,18 @@ add_filter('wp_get_attachment_image_attributes', function($attr) {
     for (const img of heavy.slice(0,2)) {
       push('Images','high',`Large image: ${img.filename} (${img.sizeKB}KB)`,
         `${img.sizeKB}KB — aim for under 150KB.`,
-        'Convert to WebP and compress. Install ShortPixel, Imagify, or Smush plugin. Or use CLI:
-cwebp -q 80 image.jpg -o image.webp
-# Then serve WebP via .htaccess:
-<IfModule mod_rewrite.c>
-  RewriteCond %{HTTP_ACCEPT} image/webp
-  RewriteCond %{REQUEST_FILENAME}.webp -f
-  RewriteRule ^(.+)\.(jpe?g|png)$ $1.webp [T=image/webp,L]
-</IfModule>',
+        'Compress image. LiteSpeed Cache → Image Optimization → WebP Replacement → ON (needs free QUIC.cloud API key).',
         { imageUrl:img.src, selector:`img[src*="${img.filename}"]`, context:img.raw||'', raw:img.raw||'' });
     }
     if (noWebP.length>0)
       push('Images','high',`${noWebP.length} image(s) not in WebP/AVIF format`,
         noWebP.slice(0,4).map(i=>i.filename).join(', '),
-        'Convert images to WebP format to save 30–50% file size. Use ShortPixel or Imagify plugin, or bulk convert with:
-for f in *.jpg *.png; do cwebp -q 80 "$f" -o "${f%.*}.webp"; done
-Then serve via your cache plugin or .htaccess WebP rewrite rules.');
+        'Convert to WebP: LiteSpeed Cache → Image Optimization → WebP Replacement → ON. Needs free QUIC.cloud API key. Saves 30–50% file size per image.');
     const totalKB = imgData.reduce((s,i)=>s+i.sizeKB,0);
     if (totalKB>1000)
       push('Images','high',`Total image weight on page: ${totalKB}KB`,
         `${imgData.length} images checked totalling ${totalKB}KB. Target: under 500KB.`,
-        'Enable WebP conversion and image compression (ShortPixel, Imagify, or Smush plugin). Enable lazy loading. Consider a CDN (Cloudflare free tier, BunnyCDN, or KeyCDN) to serve images from edge locations globally.');
+        'Enable WebP conversion. Compress all images. Enable lazy loading for below-fold images. Use CDN (QUIC.cloud or Cloudflare).');
   }
 
   // iframes
@@ -869,7 +726,7 @@ export default async function handler(req, res) {
           : [];
 
         const isHomepage = (page.finalUrl||url).replace(/\/$/,'') === baseNorm;
-        const result = await auditPage(page.finalUrl||url, page.html, page.status, page.ttfb, page.headers, imgs, siteBaseUrl, isHomepage, page.cachedBy||null);
+        const result = await auditPage(page.finalUrl||url, page.html, page.status, page.ttfb, page.headers, imgs, siteBaseUrl, isHomepage);
 
         // Merge redirect issues
         result.issues.unshift(...redirectIssues);
