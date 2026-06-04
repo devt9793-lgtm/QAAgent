@@ -1413,11 +1413,12 @@ export default async function handler(req, res) {
         ]);
 
         // Step 3: Run all HTML-based checks (no network, instant)
+        // Note: builder is detected inside auditPage via parseMeta(), so we pass null here
         return await auditPage(
           pageUrl, page.html, page.status, page.ttfb,
           page.headers, page.redirectChain,
           imgData, brokenLinks, wpSecurity,
-          siteBaseUrl || url, siteChecks, pageResult.meta?.builder
+          siteBaseUrl || url, siteChecks, null
         );
 
       } catch(e) {
