@@ -1,7 +1,6 @@
 // api/audit-pages.js — Site Audit Agent v3.1
 // Audits a batch of URLs — 90+ checks across 8 categories
 // Returns detailed results with element paths, line numbers, selectors
-
 export const config = { maxDuration: 55 };
 
 // ─────────────────────────────────────────────────────────────
