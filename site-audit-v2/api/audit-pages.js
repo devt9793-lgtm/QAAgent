@@ -1385,23 +1385,15 @@ export default async function handler(req, res) {
 
     // ── PAGE AUDITS (run in parallel, but with controlled network usage) ─
     const results = await Promise.all(batch.map(async (url) => {
-      // FIX: wrap entire page audit in try/catch — never return undefined/null
-      // FIX: removed 'pageResult' (undefined variable) — builder is detected inside auditPage via parseMeta()
       try {
         // Step 1: Fetch the page HTML
         const page = await fetchPage(url);
         if (!page.ok) {
           return {
-            url, status: page.status || 0, ttfb: page.ttfb || 0,
-            meta: { title: '', desc: '', robots: 'index,follow', wordCount: 0, domElements: 0, htmlSizeKB: 0, schemaTypes: [], builder: { id: 'custom', name: 'Unknown', icon: '⚙️' } },
+            url, status: page.status || 0, ttfb: page.ttfb,
+            meta: { title: '', desc: '', robots: '', wordCount: 0, domElements: 0, htmlSizeKB: 0, schemaTypes: [] },
             counts: {}, imageData: [], tracking: {}, devUrls: 0, dummyContent: 0, redirectChain: [],
-            issues: [{
-              category: 'Performance', severity: 'critical',
-              title: `Page failed to load (${page.status || 'timeout'})`,
-              detail: `URL: ${url} — ${page.error || 'No response from server'}`,
-              fix: 'Check the URL is correct and the server is responding. Verify the site is accessible from external networks.',
-              location: null
-            }]
+            issues: [{ category: 'Performance', severity: 'critical', title: `Page failed to load: ${page.error || 'Unknown error'}`, detail: url, fix: 'Check the URL is correct and the server is responding. Verify the site is accessible from external networks.', location: null }]
           };
         }
 
@@ -1409,39 +1401,33 @@ export default async function handler(req, res) {
         const parsedImages = parseImages(page.html);
         const parsedLinks  = parseLinks(page.html);
 
-        // Step 2: Image + link checks — max 8 per page to avoid timeout
+        // Step 2: Image + link checks with REDUCED limits to prevent timeout
+        // Images: max 8 per page (was 12), Links: max 8 per page (was 12)
         const [imgData, brokenLinks] = await Promise.all([
           checkImages
-            ? auditImageFiles(parsedImages, pageUrl, 8)
+            ? auditImageFiles(parsedImages, pageUrl, 8)   // reduced from 12
             : Promise.resolve([]),
           checkLinks
-            ? checkBrokenLinks(parsedLinks, pageUrl, 8)
+            ? checkBrokenLinks(parsedLinks, pageUrl, 8)   // reduced from 12
             : Promise.resolve([]),
         ]);
 
         // Step 3: Run all HTML-based checks (no network, instant)
-        // NOTE: builder=null is correct — auditPage detects builder via parseMeta() internally
         return await auditPage(
           pageUrl, page.html, page.status, page.ttfb,
           page.headers, page.redirectChain,
           imgData, brokenLinks, wpSecurity,
-          siteBaseUrl || url, siteChecks, null
+          siteBaseUrl || url, siteChecks, null  // builder auto-detected inside auditPage() via parseMeta()
         );
 
       } catch(e) {
-        // Surface the real error message as a visible issue in the UI
-        console.error('[audit-pages] Page error for', url, ':', e.message);
+        // Surface real error as a visible issue — never silently swallow
+        console.error('[audit-pages] Exception for', url, '-', e.message, e.stack ? e.stack.split('\n')[1] : '');
         return {
           url, status: 0, ttfb: 0,
           meta: { title: '', desc: '', robots: 'index,follow', wordCount: 0, domElements: 0, htmlSizeKB: 0, schemaTypes: [], builder: { id: 'custom', name: 'Unknown', icon: '⚙️' } },
           counts: {}, imageData: [], tracking: {}, devUrls: 0, dummyContent: 0, redirectChain: [],
-          issues: [{
-            category: 'Performance', severity: 'critical',
-            title: `Audit exception: ${e.message}`,
-            detail: `Page: ${url}\nError: ${e.stack ? e.stack.split('\n').slice(0,3).join(' | ') : e.message}`,
-            fix: 'This is a server-side audit error. Check Vercel function logs for the full stack trace.',
-            location: null
-          }]
+          issues: [{ category: 'Performance', severity: 'critical', title: 'Audit error: ' + e.message, detail: 'Page: ' + url + ' | Error: ' + (e.stack ? e.stack.split('\n').slice(0,2).join(' ') : e.message), fix: 'Open Vercel dashboard → Functions → View logs to see the full error. Common cause: undefined variable in audit logic.', location: null }]
         };
       }
     }));
