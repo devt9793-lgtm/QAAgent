@@ -668,7 +668,13 @@ async function startAudit() {
       document.getElementById('status-pill').textContent = 'Complete';
       document.getElementById('status-pill').className = 'status-pill done';
       document.getElementById('run-btn').disabled = false;
-      renderResults();
+      try {
+        renderResults();
+      } catch(renderErr) {
+        console.error('[renderResults] Error:', renderErr);
+        document.getElementById('issues-list').innerHTML =
+          '<div class="empty-state"><div class="icon">⚠</div><p>Render error: ' + renderErr.message + '. Check console for details.</p></div>';
+      }
     }, 800);
 
   } catch(e) {
@@ -756,10 +762,10 @@ function renderResults(shared = false) {
   })();;
 
   // Builder badge — show detected technology prominently
-  detectedBuilder = (auditData.pages && auditData.pages[0] && auditData.pages[0].meta && auditData.pages[0].meta.builder)
-    ? auditData.pages[0].meta.builder : { id: 'custom', name: 'Unknown', icon: '⚙️' };
-  const homeBuilder = detectedBuilder
-    ? auditData.pages[0].meta.builder : { id: 'custom', name: 'Unknown', icon: '⚙️' };
+  const homePage = auditData.pages && auditData.pages[0];
+  detectedBuilder = (homePage && homePage.meta && homePage.meta.builder)
+    ? homePage.meta.builder : { id: 'custom', name: 'Unknown', icon: '⚙️' };
+  const homeBuilder = detectedBuilder;
   const oldBadge = document.getElementById('builder-badge');
   if (oldBadge) oldBadge.remove();
   const bdg = document.createElement('div');
@@ -803,7 +809,7 @@ function renderResults(shared = false) {
   renderRobotsSitemap();
 
   // Tracking
-  const homeTracking = auditData.pages[0]?.tracking || {};
+  const homeTracking = (auditData.pages[0]?.tracking) || {};
   document.getElementById('tracking-grid').innerHTML = [
     { l:'GA4',       v: homeTracking.hasGA4   },
     { l:'GTM',       v: homeTracking.hasGTM   },
