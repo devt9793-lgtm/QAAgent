@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Audit Tool Debugger — Live Web Search</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0F1117;--surface:#1A1D27;--surface2:#22263A;--border:rgba(255,255,255,.08);
+  --gold:#F0A500;--gold2:#FFD166;--green:#10B981;--red:#EF4444;--blue:#3B82F6;--purple:#8B5CF6;
+  --txt:#F1F5F9;--txt2:#94A3B8;--txt3:#4B5563;
+  --font:'Segoe UI',system-ui,sans-serif;--mono:'Cascadia Code','Fira Code',monospace;
+}
+html{font-size:14px;-webkit-font-smoothing:antialiased}
+body{font-family:var(--font);background:var(--bg);color:var(--txt);min-height:100vh;padding:24px}
+h1{font-size:22px;font-weight:700;background:linear-gradient(90deg,var(--gold),var(--gold2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px}
+.sub{font-size:12px;color:var(--txt2);margin-bottom:24px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:600;color:var(--txt);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+label{font-size:11px;color:var(--txt2);display:block;margin-bottom:5px}
+input,textarea,select{width:100%;padding:10px 12px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;color:var(--txt);font-size:13px;font-family:var(--font);outline:none;transition:border-color .15s}
+input:focus,textarea:focus{border-color:rgba(240,165,0,.5)}
+textarea{min-height:100px;resize:vertical;font-family:var(--mono);font-size:12px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn{padding:11px 24px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);transition:all .15s;display:inline-flex;align-items:center;gap:8px}
+.btn-primary{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0F1117}
+.btn-primary:hover{opacity:.9;transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn-sec{background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--txt2)}
+.btn-sec:hover{background:rgba(255,255,255,.1);color:var(--txt)}
+.output{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:16px;display:none;min-height:120px}
+.output.visible{display:block}
+.output-title{font-size:11px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
+.stream-text{font-size:13px;color:var(--txt);line-height:1.8;white-space:pre-wrap;word-break:break-word}
+.stream-text code{background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;font-family:var(--mono);font-size:11px;color:var(--gold2)}
+.stream-text strong{color:var(--gold2);font-weight:600}
+.stream-text h3{color:var(--green);font-size:14px;margin:14px 0 6px;font-weight:600}
+.stream-text ul{padding-left:18px;margin:6px 0}
+.stream-text li{margin-bottom:4px;color:var(--txt2)}
+.badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px}
+.badge-green{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3)}
+.badge-red{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.badge-blue{background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.3)}
+.badge-gold{background:rgba(240,165,0,.15);color:var(--gold);border:1px solid rgba(240,165,0,.3)}
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.2);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sources{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px}
+.src-chip{font-size:10px;padding:3px 8px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);border-radius:4px;color:#60A5FA;text-decoration:none;white-space:nowrap}
+.src-chip:hover{background:rgba(59,130,246,.2)}
+.quick-btns{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.qbtn{font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--txt2);cursor:pointer;font-family:var(--font);transition:all .12s}
+.qbtn:hover{border-color:rgba(240,165,0,.4);color:var(--gold)}
+.status-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;color:var(--txt2)}
+.divider{height:1px;background:var(--border);margin:16px 0}
+.known-fix{background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:12px 14px;margin-bottom:10px}
+.known-fix-title{font-size:12px;font-weight:600;color:var(--green);margin-bottom:6px}
+.known-fix-code{background:rgba(0,0,0,.3);border-radius:6px;padding:10px 12px;font-size:11px;font-family:var(--mono);color:#A5F3C4;line-height:1.7;overflow-x:auto;white-space:pre;margin-top:6px}
+</style>
+</head>
+<body>
+
+<h1>🔍 Audit Tool Debugger</h1>
+<p class="sub">Searches Vercel docs, GitHub issues, MDN, Stack Overflow and more to find real solutions for your audit tool</p>
+
+<div class="card">
+  <div class="card-title">⚡ Known Fix — Deployed & Confirmed</div>
+  <div class="known-fix">
+    <div class="known-fix-title">🔴 Bug: <code>pageResult.meta?.builder</code> — ReferenceError crashes every page audit silently</div>
+    <p style="font-size:12px;color:var(--txt2);margin-bottom:8px">In <code>api/audit-pages.js</code> line ~1420, <code>pageResult</code> is never declared. Every page audit throws <code>ReferenceError: pageResult is not defined</code>, caught silently, returning empty results. This is why you see 0 pages, 0 issues.</p>
+    <div class="known-fix-code">// BROKEN (original)
+return await auditPage(
+  pageUrl, page.html, page.status, page.ttfb,
+  page.headers, page.redirectChain,
+  imgData, brokenLinks, wpSecurity,
+  siteBaseUrl || url, siteChecks, pageResult.meta?.builder  // ← ReferenceError
+);
+
+// FIXED
+return await auditPage(
+  pageUrl, page.html, page.status, page.ttfb,
+  page.headers, page.redirectChain,
+  imgData, brokenLinks, wpSecurity,
+  siteBaseUrl || url, siteChecks, null  // ← builder detected inside auditPage()
+);</div>
+  </div>
+
+  <div style="margin-top:12px">
+    <div class="card-title" style="margin-bottom:8px">🚦 Verify your deploy worked — check these in order</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:12px;color:var(--txt2);padding:8px 12px;background:rgba(255,255,255,.03);border-radius:6px;border-left:3px solid var(--blue)">
+        <strong style="color:var(--txt)">Step 1:</strong> Visit <code>https://YOUR-SITE.vercel.app/api/audit-pages</code> — should return <code>{"error":"POST only"}</code>
+      </div>
+      <div style="font-size:12px;color:var(--txt2);padding:8px 12px;background:rgba(255,255,255,.03);border-radius:6px;border-left:3px solid var(--blue)">
+        <strong style="color:var(--txt)">Step 2:</strong> Run an audit → DevTools → Network tab → click <code>audit-pages</code> request → Preview tab → look for <code>"results":[...]</code> with actual data
+      </div>
+      <div style="font-size:12px;color:var(--txt2);padding:8px 12px;background:rgba(255,255,255,.03);border-radius:6px;border-left:3px solid var(--blue)">
+        <strong style="color:var(--txt)">Step 3:</strong> DevTools → Console tab → look for lines starting with <code>[audit-pages] Batch 1 response:</code>
+      </div>
+      <div style="font-size:12px;color:var(--txt2);padding:8px 12px;background:rgba(255,255,255,.03);border-radius:6px;border-left:3px solid var(--gold)">
+        <strong style="color:var(--gold)">If still broken:</strong> Vercel → your project → Settings → Git → Redeploy with "Clear build cache" checked
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">🌐 Search for Solutions Online</div>
+  <p style="font-size:12px;color:var(--txt2);margin-bottom:12px">Describe your problem and I'll search Vercel docs, GitHub issues, Stack Overflow, and MDN to find the best solution.</p>
+
+  <div class="quick-btns">
+    <button class="qbtn" onclick="fillQuery('Vercel serverless function returns empty results no error Node.js')">Vercel empty results</button>
+    <button class="qbtn" onclick="fillQuery('Vercel function ReferenceError caught silently returns empty array')">Silent ReferenceError</button>
+    <button class="qbtn" onclick="fillQuery('Vercel audit-pages function timeout 55 seconds site audit tool')">Function timeout</button>
+    <button class="qbtn" onclick="fillQuery('WordPress site audit tool JavaScript fetch page issues not showing')">Audit tool issues</button>
+    <button class="qbtn" onclick="fillQuery('Vercel serverless function 0 pages returned Promise.all catch empty')">Promise.all empty</button>
+    <button class="qbtn" onclick="fillQuery('PageSpeed Insights API integration Vercel serverless function')">PSI API integration</button>
+  </div>
+
+  <label>Your question or problem</label>
+  <textarea id="query" placeholder="e.g. My Vercel audit function returns success:true but results array is empty, no error shown. Using Node 18, audit-pages.js fetches pages in parallel with Promise.all..."></textarea>
+
+  <div class="row" style="margin-top:12px">
+    <div>
+      <label>Error message (if any)</label>
+      <input id="error-msg" placeholder="e.g. ReferenceError: pageResult is not defined">
+    </div>
+    <div>
+      <label>Technology stack</label>
+      <input id="stack" value="Vercel serverless, Node.js 18, Vanilla JS" placeholder="e.g. Vercel, Node 18, vanilla JS">
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+    <button class="btn btn-primary" id="search-btn" onclick="searchSolutions()">
+      <span>🔍 Search for Solutions</span>
+    </button>
+    <button class="btn btn-sec" onclick="clearOutput()">Clear</button>
+  </div>
+
+  <div class="output" id="output">
+    <div class="status-row" id="status-row"></div>
+    <div class="output-title">Solution</div>
+    <div class="stream-text" id="stream-text"></div>
+    <div class="sources" id="sources"></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">📋 Paste API Response — Instant Diagnosis</div>
+  <p style="font-size:12px;color:var(--txt2);margin-bottom:12px">Copy the raw JSON from DevTools Network tab (the audit-pages response) and paste it here for instant AI diagnosis.</p>
+  <textarea id="api-response" placeholder='Paste JSON here e.g. {"success":true,"results":[...]} or {"error":"..."}'></textarea>
+  <button class="btn btn-primary" style="margin-top:10px" onclick="diagnoseResponse()">🩺 Diagnose This Response</button>
+  <div class="output" id="diag-output">
+    <div class="status-row" id="diag-status"></div>
+    <div class="output-title">Diagnosis</div>
+    <div class="stream-text" id="diag-text"></div>
+  </div>
+</div>
+
+<script>
+const API_URL = 'https://api.anthropic.com/v1/messages';
+const MODEL = 'claude-sonnet-4-20250514';
+
+function fillQuery(text) {
+  document.getElementById('query').value = text;
+}
+
+function clearOutput() {
+  const o = document.getElementById('output');
+  o.classList.remove('visible');
+  document.getElementById('stream-text').innerHTML = '';
+  document.getElementById('sources').innerHTML = '';
+}
+
+function setStatus(el, icon, text, spinning = false) {
+  el.innerHTML = (spinning ? '<div class="spinner"></div>' : icon + ' ') + '<span>' + text + '</span>';
+}
+
+function renderMarkdown(text) {
+  return text
+    .replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) =>
+      '<div style="background:rgba(0,0,0,.35);border-radius:6px;padding:10px 12px;margin:8px 0;font-size:11px;font-family:var(--mono);color:#A5F3C4;line-height:1.6;overflow-x:auto;white-space:pre">' + code.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h3 style="color:var(--gold2)">$1</h3>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>)/g, '<ul>$1</ul>')
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>');
+}
+
+async function searchSolutions() {
+  const query = document.getElementById('query').value.trim();
+  const errorMsg = document.getElementById('error-msg').value.trim();
+  const stack = document.getElementById('stack').value.trim();
+
+  if (!query) { alert('Please enter your question'); return; }
+
+  const btn = document.getElementById('search-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> <span>Searching…</span>';
+
+  const output = document.getElementById('output');
+  const statusRow = document.getElementById('status-row');
+  const streamText = document.getElementById('stream-text');
+  const sourcesEl = document.getElementById('sources');
+
+  output.classList.add('visible');
+  streamText.innerHTML = '';
+  sourcesEl.innerHTML = '';
+  setStatus(statusRow, '', 'Searching Vercel docs, GitHub issues, Stack Overflow, MDN…', true);
+
+  const prompt = `You are a senior web developer and Vercel/Node.js expert. 
+The user has a site audit tool deployed on Vercel using serverless functions.
+
+Problem: ${query}
+${errorMsg ? `Error message: ${errorMsg}` : ''}
+${stack ? `Stack: ${stack}` : ''}
+
+Search the web for the best solutions. Look at:
+- Vercel official documentation
+- GitHub issues for similar problems  
+- Stack Overflow answers
+- MDN Web Docs
+- Node.js documentation
+
+Provide:
+1. Root cause explanation (what exactly is going wrong)
+2. The exact fix with working code
+3. How to verify the fix worked
+4. Any related issues to watch out for
+
+Be specific, practical, and show actual code fixes.`;
+
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 1000,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    const data = await response.json();
+
+    // Extract text from all content blocks
+    const textBlocks = (data.content || []).filter(b => b.type === 'text').map(b => b.text);
+    const searchBlocks = (data.content || []).filter(b => b.type === 'tool_use');
+    const resultBlocks = (data.content || []).filter(b => b.type === 'tool_result');
+
+    // Show search queries used
+    if (searchBlocks.length > 0) {
+      setStatus(statusRow, '🌐', 'Searched: ' + searchBlocks.map(b => '"' + (b.input?.query || '') + '"').join(', '));
+    } else {
+      setStatus(statusRow, '✅', 'Analysis complete');
+    }
+
+    const fullText = textBlocks.join('\n\n');
+    streamText.innerHTML = fullText ? renderMarkdown(fullText) : '<span style="color:var(--txt3)">No response received. Check your connection.</span>';
+
+    // Extract any URLs mentioned for sources
+    const urls = fullText.match(/https?:\/\/[^\s)"<>]+/g) || [];
+    const uniqueUrls = [...new Set(urls)].filter(u =>
+      u.includes('vercel.com') || u.includes('stackoverflow.com') ||
+      u.includes('github.com') || u.includes('developer.mozilla.org') ||
+      u.includes('nodejs.org')
+    ).slice(0, 6);
+
+    if (uniqueUrls.length > 0) {
+      sourcesEl.innerHTML = '<span style="font-size:10px;color:var(--txt3);margin-right:6px">Sources:</span>' +
+        uniqueUrls.map(u => {
+          const domain = new URL(u).hostname.replace('www.','');
+          return `<a href="${u}" target="_blank" class="src-chip">${domain}</a>`;
+        }).join('');
+    }
+
+  } catch(e) {
+    setStatus(statusRow, '❌', 'Error: ' + e.message);
+    streamText.innerHTML = '<span style="color:var(--red)">Search failed: ' + e.message + '</span>';
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<span>🔍 Search for Solutions</span>';
+}
+
+async function diagnoseResponse() {
+  const raw = document.getElementById('api-response').value.trim();
+  if (!raw) { alert('Paste an API response first'); return; }
+
+  const diagOutput = document.getElementById('diag-output');
+  const diagStatus = document.getElementById('diag-status');
+  const diagText = document.getElementById('diag-text');
+
+  diagOutput.classList.add('visible');
+  diagText.innerHTML = '';
+  setStatus(diagStatus, '', 'Analysing response…', true);
+
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch(e) {
+    diagText.innerHTML = '<span style="color:var(--red)">Invalid JSON: ' + e.message + '</span>';
+    setStatus(diagStatus, '❌', 'Invalid JSON');
+    return;
+  }
+
+  const prompt = `You are debugging a Vercel site audit tool. Analyse this API response from the audit-pages endpoint and explain:
+1. What it means
+2. Whether it's correct or has a bug
+3. Exact fix if broken
+
+Response:
+${JSON.stringify(parsed, null, 2).slice(0, 3000)}
+
+Focus on: are results empty? are there error issues? is the structure correct? what is wrong?`;
+
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await response.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    setStatus(diagStatus, '✅', 'Diagnosis complete');
+    diagText.innerHTML = renderMarkdown(text || 'No diagnosis available');
+  } catch(e) {
+    setStatus(diagStatus, '❌', 'Error: ' + e.message);
+    diagText.innerHTML = '<span style="color:var(--red)">' + e.message + '</span>';
+  }
+}
+</script>
+</body>
+</html>
