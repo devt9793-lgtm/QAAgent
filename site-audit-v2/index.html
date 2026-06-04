@@ -605,18 +605,20 @@ async function startAudit() {
           siteBaseUrl: baseUrl,
           checkImages: checkImages && i === 0, // only check image files on first batch
         });
-        // DEBUG: log raw API response to console for diagnosis
-        console.log('[audit-pages] Batch', batchNum, 'response:', JSON.stringify(batchRes).slice(0, 500));
-        if (batchRes.results) {
+        console.log('[audit] batch response keys:', Object.keys(batchRes || {}));
+        if (batchRes.results && batchRes.results.length > 0) {
+          console.log('[audit] batch got', batchRes.results.length, 'pages, first page issues:', batchRes.results[0]?.issues?.length);
           allResults.push(...batchRes.results);
           const totalIssues = allResults.reduce((s, p) => s + (p.issues?.length || 0), 0);
           document.getElementById('ps-checked').textContent = allResults.length;
           document.getElementById('ps-issues').textContent  = totalIssues;
         } else if (batchRes.error) {
-          console.error('[audit-pages] Batch', batchNum, 'error:', batchRes.error);
+          console.error('[audit] batch API error:', batchRes.error);
+        } else {
+          console.warn('[audit] batch returned no results. Full response:', JSON.stringify(batchRes).slice(0, 400));
         }
       } catch(e) {
-        console.warn('Batch error:', e.message);
+        console.error('[audit] batch fetch error:', e.message);
       }
     }
 
@@ -675,9 +677,11 @@ async function startAudit() {
       try {
         renderResults();
       } catch(renderErr) {
-        console.error('[renderResults] Crash:', renderErr);
+        console.error('[renderResults] crash:', renderErr.message, renderErr.stack);
         document.getElementById('issues-list').innerHTML =
-          '<div class="empty-state"><div class="icon">⚠</div><p style="color:#EF4444">Render error: ' + renderErr.message + '<br><small style="color:#94A3B8">Open DevTools console for full trace</small></p></div>';
+          '<div class="empty-state"><div class="icon">⚠</div>' +
+          '<p style="color:#EF4444;font-size:13px">UI render error: ' + renderErr.message + '</p>' +
+          '<p style="color:#94A3B8;font-size:11px;margin-top:6px">Open DevTools console (F12) for full details</p></div>';
       }
     }, 800);
 
@@ -766,9 +770,9 @@ function renderResults(shared = false) {
   })();;
 
   // Builder badge — show detected technology prominently
-  const homePage = auditData.pages && auditData.pages[0];
-  detectedBuilder = (homePage && homePage.meta && homePage.meta.builder)
-    ? homePage.meta.builder : { id: 'custom', name: 'Unknown', icon: '⚙️' };
+  const _homePage = auditData.pages && auditData.pages[0];
+  detectedBuilder = (_homePage && _homePage.meta && _homePage.meta.builder)
+    ? _homePage.meta.builder : { id: 'custom', name: 'Unknown', icon: '⚙️' };
   const homeBuilder = detectedBuilder;
   const oldBadge = document.getElementById('builder-badge');
   if (oldBadge) oldBadge.remove();
@@ -813,7 +817,7 @@ function renderResults(shared = false) {
   renderRobotsSitemap();
 
   // Tracking
-  const homeTracking = auditData.pages?.[0]?.tracking || {};
+  const homeTracking = (auditData.pages && auditData.pages[0] && auditData.pages[0].tracking) || {};
   document.getElementById('tracking-grid').innerHTML = [
     { l:'GA4',       v: homeTracking.hasGA4   },
     { l:'GTM',       v: homeTracking.hasGTM   },
@@ -829,7 +833,7 @@ function renderResults(shared = false) {
   }).join('');
 
   // Images
-  const homeImgs = auditData.pages?.[0]?.imageData || [];
+  const homeImgs = (auditData.pages && auditData.pages[0] && auditData.pages[0].imageData) || [];
   if (homeImgs.length > 0) {
     document.getElementById('img-section').style.display = 'block';
     const heavy = homeImgs.filter(i => i.sizeKB > 200).length;
