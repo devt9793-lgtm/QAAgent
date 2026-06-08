@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Site Audit Agent — Professional QA Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0F1C2E;--navy2:#162035;--navy3:#1E2D45;--navy4:#243350;
+  --gold:#C8973A;--gold2:#E5B060;
+  --g:#10B981;--gbg:rgba(16,185,129,.1);--gdk:#065F46;
+  --red:#EF4444;--redbg:rgba(239,68,68,.1);--reddk:#991B1B;
+  --amber:#F59E0B;--amberbg:rgba(245,158,11,.1);
+  --blue:#3B82F6;--bluebg:rgba(59,130,246,.1);
+  --purple:#8B5CF6;--purplebg:rgba(139,92,246,.1);
+  --teal:#14B8A6;--tealbg:rgba(20,184,166,.1);
+  --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.04);
+  --txt:#F1F5F9;--txt2:#94A3B8;--txt3:#64748B;
+  --surf:rgba(255,255,255,.03);--surf2:rgba(255,255,255,.06);
+  --font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace;
+  --radius:10px;--radius-sm:6px;
+  --shadow:0 4px 20px rgba(0,0,0,.4);
+}
+html{font-size:14px;-webkit-font-smoothing:antialiased}
+body{font-family:var(--font);background:var(--navy);color:var(--txt);min-height:100vh;overflow-x:hidden}
+
+/* ── TOPBAR ─────────────────────────────────────────────── */
+.topbar{height:56px;background:rgba(15,28,46,.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:fixed;top:0;left:0;right:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.logo-mark{width:32px;height:32px;background:linear-gradient(135deg,var(--gold),var(--gold2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.logo-text{font-size:14px;font-weight:700;color:var(--txt);letter-spacing:-.02em}
+.logo-sub{font-size:10px;color:var(--txt3);margin-top:1px}
+.topbar-status{display:flex;align-items:center;gap:8px}
+.status-pill{font-size:11px;font-weight:500;padding:4px 10px;border-radius:20px;border:1px solid var(--border);color:var(--txt2)}
+.status-pill.running{border-color:rgba(16,185,129,.4);color:var(--g);background:var(--gbg)}
+.status-pill.done{border-color:rgba(200,151,58,.4);color:var(--gold)}
+
+/* ── LAYOUT ─────────────────────────────────────────────── */
+.app{display:flex;min-height:100vh;padding-top:56px}
+.sidebar{width:280px;flex-shrink:0;background:var(--navy2);border-right:1px solid var(--border);position:fixed;top:56px;bottom:0;left:0;overflow-y:auto;z-index:50;display:flex;flex-direction:column}
+.main-content{flex:1;margin-left:280px;min-width:0;padding:24px}
+
+/* ── SIDEBAR ────────────────────────────────────────────── */
+.sidebar-section{padding:16px 16px 0}
+.sidebar-label{font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
+.sidebar-search{width:100%;padding:8px 12px;background:var(--surf2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-family:var(--font);color:var(--txt);outline:none;transition:border-color .15s;margin-bottom:12px}
+.sidebar-search:focus{border-color:rgba(200,151,58,.5)}
+.sidebar-search::placeholder{color:var(--txt3)}
+.filter-group{margin-bottom:14px}
+.filter-group-label{font-size:10px;font-weight:500;color:var(--txt3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
+.filter-chips{display:flex;flex-wrap:wrap;gap:4px}
+.fchip{padding:3px 9px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--txt2);font-size:11px;font-weight:500;cursor:pointer;font-family:var(--font);transition:all .12s;white-space:nowrap}
+.fchip:hover{border-color:rgba(255,255,255,.2);color:var(--txt)}
+.fchip.on{border-color:var(--gold);background:rgba(200,151,58,.15);color:var(--gold)}
+.sidebar-divider{height:1px;background:var(--border);margin:12px 0}
+.pages-list{padding:0 8px 16px;flex:1}
+.page-item{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:var(--radius-sm);cursor:pointer;margin-bottom:2px;transition:background .1s;border:1px solid transparent}
+.page-item:hover{background:var(--surf2)}
+.page-item.on{background:var(--surf2);border-color:var(--border)}
+.page-url{font-size:11px;font-family:var(--mono);color:var(--txt2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.page-item.on .page-url{color:var(--txt)}
+.page-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.page-cnt{font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;flex-shrink:0}
+.sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px}
+
+/* ── INPUT SECTION ──────────────────────────────────────── */
+.input-section{max-width:760px;margin:0 auto}
+.hero-text{text-align:center;margin-bottom:32px}
+.hero-text h1{font-size:32px;font-weight:700;letter-spacing:-.03em;line-height:1.2;margin-bottom:8px;background:linear-gradient(135deg,var(--txt) 0%,var(--txt2) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-text p{font-size:14px;color:var(--txt2);line-height:1.6}
+.input-card{background:var(--navy3);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:16px}
+.input-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.url-input{flex:1;min-width:260px;padding:12px 14px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surf);font-size:14px;font-family:var(--font);color:var(--txt);outline:none;transition:border-color .15s}
+.url-input:focus{border-color:rgba(200,151,58,.6);box-shadow:0 0 0 3px rgba(200,151,58,.1)}
+.url-input::placeholder{color:var(--txt3)}
+.sel{padding:12px 12px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surf);color:var(--txt2);font-size:13px;font-family:var(--font);cursor:pointer;outline:none}
+.run-btn{padding:12px 28px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:var(--radius);color:var(--navy);font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all .15s;white-space:nowrap;letter-spacing:-.01em}
+.run-btn:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(200,151,58,.4)}
+.run-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+.opts-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.opt-field{display:flex;flex-direction:column;gap:4px}
+.opt-label{font-size:11px;color:var(--txt2)}
+.opt-input{padding:9px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surf);font-size:12px;font-family:var(--mono);color:var(--txt);outline:none;width:100%;transition:border-color .15s}
+.opt-input:focus{border-color:rgba(200,151,58,.5)}
+.opt-input::placeholder{color:var(--txt3)}
+.opt-check{display:flex;align-items:center;gap:8px;cursor:pointer;padding:9px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surf)}
+.opt-check input{cursor:pointer;accent-color:var(--gold);width:14px;height:14px}
+.opt-check span{font-size:12px;color:var(--txt2)}
+.hint{font-size:10px;color:var(--txt3);margin-top:3px}
+
+/* ── PROGRESS ───────────────────────────────────────────── */
+.progress-card{background:var(--navy3);border:1px solid var(--border);border-radius:14px;padding:28px;display:none;text-align:center}
+.progress-icon{font-size:36px;margin-bottom:12px}
+.progress-title{font-size:16px;font-weight:700;margin-bottom:4px}
+.progress-sub{font-size:13px;color:var(--txt2);margin-bottom:20px}
+.pbar-outer{height:6px;background:var(--surf2);border-radius:3px;overflow:hidden;max-width:400px;margin:0 auto 8px;border:1px solid var(--border)}
+.pbar-inner{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:3px;width:0%;transition:width .4s ease}
+.pbar-label{font-size:11px;color:var(--txt3)}
+.progress-stats{display:flex;justify-content:center;gap:24px;margin-top:20px;flex-wrap:wrap}
+.pstat{text-align:center}
+.pstat .v{font-size:20px;font-weight:700;color:var(--gold)}
+.pstat .l{font-size:10px;color:var(--txt3);margin-top:2px}
+.err-alert{margin-top:16px;padding:10px 14px;background:var(--redbg);border:1px solid rgba(239,68,68,.3);border-radius:var(--radius-sm);font-size:12px;color:var(--red);display:none}
+
+/* ── RESULTS ────────────────────────────────────────────── */
+.results{display:none}
+
+/* Summary strip */
+.summary-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:20px}
+.scard{background:var(--navy3);border:1px solid var(--border);border-radius:var(--radius);padding:14px 12px;text-align:center;position:relative;overflow:hidden}
+.scard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.scard.critical::before{background:var(--red)}
+.scard.high::before{background:var(--amber)}
+.scard.medium::before{background:var(--blue)}
+.scard.low::before{background:var(--g)}
+.scard.total::before{background:var(--gold)}
+.scard.pages::before{background:var(--purple)}
+.scard .sv{font-size:24px;font-weight:700;line-height:1;margin-bottom:4px}
+.scard.critical .sv{color:var(--red)}
+.scard.high     .sv{color:var(--amber)}
+.scard.medium   .sv{color:var(--blue)}
+.scard.low      .sv{color:var(--g)}
+.scard.total    .sv{color:var(--gold)}
+.scard.pages    .sv{color:var(--purple)}
+.scard .sl{font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em}
+
+/* Category cards row */
+.cat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:20px}
+.ccat{background:var(--navy3);border:1px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;align-items:center;gap:10px}
+.ccat-icon{font-size:18px}
+.ccat-info{}
+.ccat-num{font-size:18px;font-weight:700;color:var(--txt)}
+.ccat-label{font-size:11px;color:var(--txt3);margin-top:1px}
+
+/* PSI scores */
+.psi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px}
+.psi-card{background:var(--navy3);border:1px solid var(--border);border-radius:var(--radius);padding:16px;text-align:center}
+.psi-score{font-size:32px;font-weight:700;line-height:1;margin-bottom:4px}
+.psi-score.good{color:var(--g)}
+.psi-score.needs{color:var(--amber)}
+.psi-score.poor{color:var(--red)}
+.psi-label{font-size:11px;color:var(--txt3)}
+.psi-metrics-row{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:20px}
+.pmet{background:var(--navy3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center}
+.pmet .v{font-size:14px;font-weight:600;color:var(--txt)}
+.pmet .l{font-size:9px;color:var(--txt3);margin-top:2px;text-transform:uppercase;letter-spacing:.05em}
+
+/* Robots/Sitemap strip */
+.rs-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px}
+.rs-card{background:var(--navy3);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+.rs-title{font-size:12px;font-weight:600;color:var(--txt);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.rs-item{font-size:11px;padding:5px 0;border-bottom:1px solid var(--border2);color:var(--txt2);line-height:1.5;display:flex;align-items:flex-start;gap:6px}
+.rs-item:last-child{border-bottom:none;padding-bottom:0}
+.rs-item::before{content:'';width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.rs-item.ok::before{background:var(--g)}
+.rs-item.warn::before{background:var(--amber)}
+.rs-item.err::before{background:var(--red)}
+.rs-item.ok{color:#34D399}
+.rs-item.warn{color:var(--amber)}
+.rs-item.err{color:var(--red)}
+
+/* Image table */
+.img-section{background:var(--navy3);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:20px;overflow:hidden}
+.img-section-hdr{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.img-section-title{font-size:13px;font-weight:600;color:var(--txt);display:flex;align-items:center;gap:6px}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{padding:8px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);background:var(--surf)}
+.tbl td{padding:8px 12px;border-bottom:1px solid var(--border2);vertical-align:middle;font-size:11px;color:var(--txt2)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--surf)}
+.tbl-mono{font-family:var(--mono);font-size:10px}
+.size-badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px}
+.size-badge.vheavy{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.size-badge.heavy {background:rgba(245,158,11,.15);color:var(--amber);border:1px solid rgba(245,158,11,.3)}
+.size-badge.ok    {background:rgba(16,185,129,.1);color:var(--g);border:1px solid rgba(16,185,129,.2)}
+.webp-badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px}
+.webp-badge.yes{background:rgba(16,185,129,.1);color:var(--g);border:1px solid rgba(16,185,129,.2)}
+.webp-badge.no {background:rgba(245,158,11,.1);color:var(--amber);border:1px solid rgba(245,158,11,.2)}
+.check-ok {color:var(--g)}
+.check-bad{color:var(--red)}
+/* ── Builder Badge ─────────────────────────── */
+.builder-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid;margin-bottom:16px}
+.builder-badge.elementor  {background:rgba(150,93,255,.12);border-color:rgba(150,93,255,.35);color:#a855f7}
+.builder-badge.divi       {background:rgba(122,72,255,.12);border-color:rgba(122,72,255,.35);color:#8b5cf6}
+.builder-badge.beaver     {background:rgba(202,138,4,.12); border-color:rgba(202,138,4,.35); color:var(--amber)}
+.builder-badge.wpbakery   {background:rgba(100,116,139,.12);border-color:rgba(100,116,139,.35);color:#94a3b8}
+.builder-badge.oxygen     {background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.35);color:var(--blue)}
+.builder-badge.bricks     {background:rgba(239,68,68,.12); border-color:rgba(239,68,68,.35); color:var(--red)}
+.builder-badge.gutenberg  {background:rgba(30,154,121,.12);border-color:rgba(30,154,121,.35);color:var(--g)}
+.builder-badge.shopify    {background:rgba(150,191,65,.12);border-color:rgba(150,191,65,.35);color:#96bf41}
+.builder-badge.squarespace{background:rgba(0,0,0,.12);     border-color:rgba(255,255,255,.2);color:var(--txt)}
+.builder-badge.wix        {background:rgba(250,197,1,.12); border-color:rgba(250,197,1,.35); color:#faC501}
+.builder-badge.webflow     {background:rgba(64,108,240,.12);border-color:rgba(64,108,240,.35);color:#4066ef}
+.builder-badge.wordpress  {background:rgba(33,117,155,.12);border-color:rgba(33,117,155,.35);color:#21759b}
+.builder-badge.nextjs     {background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:var(--txt)}
+.builder-badge.custom     {background:var(--surf2);        border-color:var(--border);        color:var(--txt2)}
+/* Builder info box in issue fix section */
+.fix-builder-note{font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;margin-right:6px;background:rgba(150,93,255,.15);color:#c084fc;border:1px solid rgba(150,93,255,.3)}
+
+/* Issue cards */
+.issues-wrap{display:flex;flex-direction:column;gap:6px}
+.issue{background:var(--navy3);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color .15s}
+.issue.critical{border-left:3px solid var(--red)}
+.issue.high    {border-left:3px solid var(--amber)}
+.issue.medium  {border-left:3px solid var(--blue)}
+.issue.low     {border-left:3px solid var(--g)}
+.issue:hover{border-color:rgba(255,255,255,.15)}
+.issue-hdr{display:flex;align-items:flex-start;gap:8px;padding:11px 14px;cursor:pointer;user-select:none;gap:8px}
+.issue-body{padding:12px 14px 14px;border-top:1px solid var(--border2)}
+.sev-badge{font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0;letter-spacing:.06em;text-transform:uppercase}
+.sev-badge.critical{background:var(--redbg);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.sev-badge.high    {background:var(--amberbg);color:var(--amber);border:1px solid rgba(245,158,11,.3)}
+.sev-badge.medium  {background:var(--bluebg);color:var(--blue);border:1px solid rgba(59,130,246,.3)}
+.sev-badge.low     {background:var(--gbg);color:var(--g);border:1px solid rgba(16,185,129,.3)}
+.cat-badge{font-size:9px;font-weight:600;padding:3px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0;text-transform:uppercase;letter-spacing:.04em}
+.cat-badge.SEO          {background:var(--tealbg);color:var(--teal);border:1px solid rgba(20,184,166,.3)}
+.cat-badge.Performance  {background:var(--bluebg);color:var(--blue);border:1px solid rgba(59,130,246,.3)}
+.cat-badge.Accessibility{background:var(--purplebg);color:var(--purple);border:1px solid rgba(139,92,246,.3)}
+.cat-badge.Security     {background:var(--redbg);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.cat-badge.Content      {background:rgba(245,158,11,.1);color:var(--amber);border:1px solid rgba(245,158,11,.3)}
+.cat-badge.Tracking     {background:rgba(16,185,129,.1);color:var(--g);border:1px solid rgba(16,185,129,.3)}
+.issue-title{flex:1;font-size:12px;font-weight:500;color:var(--txt);line-height:1.4;min-width:0}
+.issue-page-tag{font-size:9px;font-family:var(--mono);color:var(--txt3);white-space:nowrap;flex-shrink:0;align-self:center;max-width:120px;overflow:hidden;text-overflow:ellipsis}
+.issue-arr{color:var(--txt3);font-size:10px;flex-shrink:0;align-self:center;margin-left:2px}
+/* Issue body */
+.issue-detail{font-size:12px;color:var(--txt2);line-height:1.6;margin-bottom:10px}
+.issue-fix{background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:var(--radius-sm);padding:10px 12px;font-size:12px;color:#6EE7B7;line-height:1.6;margin-bottom:10px}
+.issue-fix strong{color:var(--g)}
+/* Location info box */
+.location-box{background:var(--surf);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;font-size:11px;color:var(--txt2)}
+.location-box .loc-row{display:flex;gap:8px;margin-bottom:5px;align-items:flex-start}
+.location-box .loc-row:last-child{margin-bottom:0}
+.loc-key{font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;min-width:70px;flex-shrink:0;margin-top:1px}
+.loc-val{font-family:var(--mono);font-size:10px;color:var(--txt);background:var(--surf2);padding:2px 6px;border-radius:3px;word-break:break-all;line-height:1.5}
+.loc-val.img-url{color:var(--blue)}
+/* Image preview in location */
+.loc-img-thumb{width:48px;height:36px;object-fit:cover;border-radius:3px;border:1px solid var(--border);flex-shrink:0;margin-left:auto}
+
+/* Share bar */
+.share-bar{background:var(--navy4);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;margin-bottom:20px;display:none;align-items:center;gap:12px;flex-wrap:wrap}
+.share-bar-left{flex:1}
+.share-bar h3{font-size:13px;font-weight:600;color:var(--txt);margin-bottom:2px}
+.share-bar p{font-size:11px;color:var(--txt2)}
+.share-bar-actions{display:flex;gap:8px;flex-wrap:wrap}
+.share-btn-primary{padding:8px 18px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:var(--radius-sm);color:var(--navy);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);transition:opacity .15s;white-space:nowrap}
+.share-btn-primary:hover{opacity:.9}
+.share-btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.share-btn-sec{padding:8px 16px;background:var(--surf2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--txt2);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font)}
+.share-btn-sec:hover{border-color:rgba(255,255,255,.2);color:var(--txt)}
+.share-link-box{background:var(--navy4);border:1px solid rgba(200,151,58,.4);border-radius:var(--radius);padding:16px 18px;margin-bottom:20px;display:none}
+.share-link-box h3{font-size:13px;font-weight:600;color:var(--gold);margin-bottom:3px;display:flex;align-items:center;gap:6px}
+.share-link-box p{font-size:11px;color:var(--txt2);margin-bottom:10px}
+.link-copy-row{display:flex;gap:8px}
+.link-input{flex:1;padding:9px 12px;background:var(--surf);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:11px;font-family:var(--mono);color:var(--txt);outline:none}
+.copy-btn{padding:9px 18px;background:var(--navy3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);white-space:nowrap;transition:all .15s}
+.copy-btn.copied{background:rgba(16,185,129,.15);border-color:rgba(16,185,129,.4);color:var(--g)}
+.share-meta{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap}
+.share-meta span{font-size:10px;color:var(--txt3)}
+.share-meta strong{color:var(--txt2)}
+
+/* Shared banner */
+.shared-banner{background:linear-gradient(135deg,rgba(16,185,129,.1),rgba(20,184,166,.1));border:1px solid rgba(16,185,129,.3);border-radius:var(--radius);padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.shared-banner h3{font-size:14px;font-weight:700;color:var(--g);margin-bottom:2px}
+.shared-banner p{font-size:11px;color:var(--txt2)}
+.new-audit-btn{padding:8px 16px;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.4);border-radius:var(--radius-sm);color:var(--g);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);white-space:nowrap}
+.new-audit-btn:hover{background:rgba(16,185,129,.25)}
+
+/* Tracking panel */
+.tracking-panel{background:var(--navy3);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:20px}
+.tracking-title{font-size:12px;font-weight:600;color:var(--txt);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.tracking-grid{display:flex;flex-wrap:wrap;gap:6px}
+.tracker{font-size:10px;font-weight:600;padding:4px 10px;border-radius:12px;border:1px solid;white-space:nowrap}
+.tracker.yes{background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:var(--g)}
+.tracker.no {background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.2);color:var(--txt3)}
+.tracker.warn{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:var(--amber)}
+
+/* Empty state */
+.empty-state{text-align:center;padding:60px 20px;color:var(--txt2)}
+.empty-state .icon{font-size:40px;margin-bottom:12px}
+.empty-state p{font-size:13px}
+
+/* Section heading */
+.section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.section-title{font-size:13px;font-weight:700;color:var(--txt);display:flex;align-items:center;gap:6px}
+.section-count{font-size:11px;color:var(--txt3)}
+
+/* Export row */
+.export-row{display:flex;gap:8px;margin-top:24px;flex-wrap:wrap}
+.exp-btn{padding:9px 18px;background:var(--surf);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--txt2);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font);transition:all .12s}
+.exp-btn:hover{border-color:rgba(255,255,255,.2);color:var(--txt)}
+.exp-btn.primary{background:rgba(200,151,58,.15);border-color:rgba(200,151,58,.4);color:var(--gold)}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--navy2)}
+::-webkit-scrollbar-thumb{background:var(--navy4);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.15)}
+
+/* Responsive */
+@media(max-width:900px){
+  .sidebar{display:none}
+  .main-content{margin-left:0}
+  .psi-metrics-row{grid-template-columns:repeat(3,1fr)}
+  .rs-grid{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+  .main-content{padding:16px}
+  .hero-text h1{font-size:22px}
+  .psi-grid{grid-template-columns:repeat(2,1fr)}
+  .opts-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="/" onclick="if(auditData)return confirm('Start new audit? Current results will be cleared.')">
+    <div class="logo-mark">🔬</div>
+    <div>
+      <div class="logo-text">Site Audit Agent</div>
+      <div class="logo-sub">Professional QA Platform</div>
+    </div>
+  </a>
+  <div class="topbar-status">
+    <span class="status-pill" id="status-pill">Ready</span>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section" style="padding-bottom:14px">
+      <div class="sidebar-label">Search Issues</div>
+      <input class="sidebar-search" id="sb-search" placeholder="Search…" oninput="render()">
+    </div>
+
+    <div class="sidebar-section" style="padding-bottom:14px">
+      <div class="filter-group">
+        <div class="filter-group-label">Severity</div>
+        <div class="filter-chips">
+          <button class="fchip on" data-fsev="all" onclick="setFilter('sev','all')">All</button>
+          <button class="fchip" data-fsev="critical" onclick="setFilter('sev','critical')">Critical</button>
+          <button class="fchip" data-fsev="high" onclick="setFilter('sev','high')">High</button>
+          <button class="fchip" data-fsev="medium" onclick="setFilter('sev','medium')">Medium</button>
+          <button class="fchip" data-fsev="low" onclick="setFilter('sev','low')">Low</button>
+        </div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-group-label">Category</div>
+        <div class="filter-chips">
+          <button class="fchip on" data-fcat="all" onclick="setFilter('cat','all')">All</button>
+          <button class="fchip" data-fcat="SEO" onclick="setFilter('cat','SEO')">SEO</button>
+          <button class="fchip" data-fcat="Performance" onclick="setFilter('cat','Performance')">Performance</button>
+          <button class="fchip" data-fcat="Accessibility" onclick="setFilter('cat','Accessibility')">A11y</button>
+          <button class="fchip" data-fcat="Security" onclick="setFilter('cat','Security')">Security</button>
+          <button class="fchip" data-fcat="Content" onclick="setFilter('cat','Content')">Content</button>
+          <button class="fchip" data-fcat="Tracking" onclick="setFilter('cat','Tracking')">Tracking</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-label" style="padding:0 16px 8px">Pages Scanned</div>
+    <div class="pages-list" id="pages-list">
+      <div style="font-size:11px;color:var(--txt3);padding:0 8px">Run an audit to see pages</div>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="exp-btn" onclick="exportCSV()" style="text-align:center">⬇ Export CSV</button>
+      <button class="exp-btn" onclick="exportImageCSV()" style="text-align:center">🖼 Image Report CSV</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content" id="main-content">
+
+    <!-- SHARED BANNER -->
+    <div id="shared-banner" class="shared-banner" style="display:none">
+      <div>
+        <h3 id="shared-title">Shared Report</h3>
+        <p id="shared-meta"></p>
+      </div>
+      <button class="new-audit-btn" onclick="startNewAudit()">+ New Audit</button>
+    </div>
+
+    <!-- INPUT -->
+    <div id="input-section">
+      <div class="hero-text">
+        <h1>Full Site QA Audit</h1>
+        <p>Enter any URL — the agent crawls every page and checks 50+ issues across SEO, Performance, Images, Accessibility, Security, Content and Tracking.</p>
+      </div>
+      <div class="input-card">
+        <div class="input-row">
+          <input class="url-input" id="url-input" type="url" placeholder="Site URL"
+            onkeydown="if(event.key==='Enter')startAudit()">
+          <select class="sel" id="max-pages">
+            <option value="10">10 pages</option>
+            <option value="25" selected>25 pages</option>
+            <option value="50">50 pages</option>
+            <option value="100">100 pages</option>
+            <option value="200">200 pages</option>
+            <option value="500">500 pages</option>
+          </select>
+          <button class="run-btn" id="run-btn" onclick="startAudit()">Run Audit →</button>
+        </div>
+        <div class="opts-grid">
+          <div class="opt-field">
+            <div class="opt-label">PSI API Key <span style="color:var(--txt3)">(optional — for LCP/FCP/TBT)</span></div>
+            <input class="opt-input" id="psi-key" placeholder="AIzaSy…">
+            <div class="hint">Free at console.cloud.google.com → Enable PageSpeed Insights API → Credentials → Create Key</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label class="opt-check">
+              <input type="checkbox" id="check-images" checked>
+              <span>Check image file sizes &amp; WebP format</span>
+            </label>
+            <label class="opt-check">
+              <input type="checkbox" id="check-links" checked>
+              <span>Check for broken internal links</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROGRESS -->
+    <div class="progress-card" id="progress-card">
+      <div class="progress-icon" id="prog-icon">🔍</div>
+      <div class="progress-title" id="prog-title">Discovering pages…</div>
+      <div class="progress-sub" id="prog-sub">Fetching homepage and scanning sitemap</div>
+      <div class="pbar-outer"><div class="pbar-inner" id="pbar"></div></div>
+      <div class="pbar-label" id="pbar-label">Starting…</div>
+      <div class="progress-stats">
+        <div class="pstat"><div class="v" id="ps-pages">0</div><div class="l">Pages found</div></div>
+        <div class="pstat"><div class="v" id="ps-checked">0</div><div class="l">Checked</div></div>
+        <div class="pstat"><div class="v" id="ps-issues">0</div><div class="l">Issues found</div></div>
+        <div class="pstat"><div class="v" id="ps-time">0s</div><div class="l">Elapsed</div></div>
+      </div>
+      <div class="err-alert" id="err-alert"></div>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="results" id="results">
+
+      <!-- Share bar -->
+      <div class="share-bar" id="share-bar">
+        <div class="share-bar-left">
+          <h3>📤 Share this report</h3>
+          <p>Generate a link to send to your client or development team</p>
+        </div>
+        <div class="share-bar-actions">
+          <button class="share-btn-primary" id="share-save-btn" onclick="saveAndShare()">🔗 Generate Share Link</button>
+          <button class="share-btn-sec" onclick="exportCSV()">⬇ Export CSV</button>
+        </div>
+      </div>
+
+      <!-- Share link box -->
+      <div class="share-link-box" id="share-link-box">
+        <h3>✅ Report saved</h3>
+        <p>Share this link with your client or dev team — expires in 30 days.</p>
+        <div class="link-copy-row">
+          <input class="link-input" id="share-link-input" readonly>
+          <button class="copy-btn" id="copy-btn" onclick="copyLink()">📋 Copy</button>
+        </div>
+        <div class="share-meta">
+          <span>🌐 <strong id="sm-site">—</strong></span>
+          <span>📄 <strong id="sm-pages">—</strong></span>
+          <span>🐛 <strong id="sm-issues">—</strong></span>
+          <span>⏳ Expires: <strong>30 days</strong></span>
+        </div>
+      </div>
+
+      <!-- Summary -->
+      <div class="summary-strip" id="summary-strip"></div>
+
+      <!-- Category counts -->
+      <div class="cat-row" id="cat-row"></div>
+
+      <!-- PSI (if available) -->
+      <div id="psi-section" style="display:none">
+        <div class="section-hdr">
+          <div class="section-title">📊 PageSpeed Insights — Mobile (Homepage)</div>
+        </div>
+        <div class="psi-grid" id="psi-grid"></div>
+        <div class="psi-metrics-row" id="psi-metrics"></div>
+      </div>
+
+      <!-- Robots + Sitemap -->
+      <div class="rs-grid" id="rs-grid"></div>
+
+      <!-- Tracking summary -->
+      <div class="tracking-panel" id="tracking-panel">
+        <div class="tracking-title">📡 Tracking & Analytics</div>
+        <div class="tracking-grid" id="tracking-grid"></div>
+      </div>
+
+      <!-- Image audit -->
+      <div class="img-section" id="img-section" style="display:none">
+        <div class="img-section-hdr">
+          <div class="img-section-title">🖼 Image Audit — Homepage</div>
+          <span id="img-summary" style="font-size:11px;color:var(--txt3)"></span>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="tbl">
+            <thead><tr>
+              <th>Filename</th>
+              <th>Size</th>
+              <th>Format</th>
+              <th>Alt</th>
+              <th>Lazy</th>
+              <th>Dimensions</th>
+            </tr></thead>
+            <tbody id="img-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Issues -->
+      <div class="section-hdr">
+        <div class="section-title">🐛 Issues Found</div>
+        <span class="section-count" id="issues-count"></span>
+      </div>
+      <div class="issues-wrap" id="issues-list"></div>
+
+      <div class="export-row">
+        <button class="exp-btn primary" onclick="exportCSV()">⬇ Export All Issues CSV</button>
+        <button class="exp-btn" onclick="exportImageCSV()">🖼 Export Image Report CSV</button>
+        <button class="exp-btn" onclick="printReport()">🖨 Print Report</button>
+      </div>
+
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────
+let auditData     = null;
+let detectedBuilder = { id: 'custom', name: 'Unknown', icon: '⚙️' };
+let filterSev     = 'all';
+let filterCat     = 'all';
+let filterPage    = 'all';
+let currentShareId = null;
+let isSharedView  = false;
+let auditStartTime = 0;
+let timerInterval  = null;
+
+// ─── Start audit flow ─────────────────────────────────────
+async function startAudit() {
+  const url = document.getElementById('url-input').value.trim();
+  if (!url) { alert('Please enter a URL'); return; }
+
+  const maxPages    = parseInt(document.getElementById('max-pages').value) || 25;
+  const psiKey      = document.getElementById('psi-key').value.trim();
+  const checkImages = document.getElementById('check-images').checked;
+
+  // Reset UI
+  auditData = null; currentShareId = null;
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('share-bar').style.display = 'none';
+  document.getElementById('share-link-box').style.display = 'none';
+  document.getElementById('input-section').style.display = 'none';
+  document.getElementById('progress-card').style.display = 'block';
+  document.getElementById('err-alert').style.display = 'none';
+  document.getElementById('run-btn').disabled = true;
+  document.getElementById('status-pill').textContent = 'Running…';
+  document.getElementById('status-pill').className = 'status-pill running';
+  setProg(0, 'Discovering pages…', 'Fetching homepage and scanning sitemap.xml');
+  document.getElementById('prog-icon').textContent = '🔍';
+
+  auditStartTime = Date.now();
+  timerInterval = setInterval(() => {
+    document.getElementById('ps-time').textContent = Math.round((Date.now() - auditStartTime) / 1000) + 's';
+  }, 1000);
+
+  try {
+    // STEP 1: Discover all URLs
+    const discRes = await apiCall('/api/discover', { url, maxPages });
+    if (!discRes.success) throw new Error(discRes.error || 'Discovery failed');
+
+    const { urls, baseUrl, isWordPress, totalFound } = discRes;
+    document.getElementById('ps-pages').textContent = urls.length;
+    setProg(10, 'Pages discovered', `Found ${urls.length} pages (${totalFound} total in sitemap). Starting audit…`);
+
+    // STEP 2: Batch crawl in groups of 8
+    const allResults = [];
+    const batchSize  = 8;
+    const totalBatches = Math.ceil(urls.length / batchSize);
+
+    for (let i = 0; i < urls.length; i += batchSize) {
+      const batch     = urls.slice(i, i + batchSize);
+      const batchNum  = Math.floor(i / batchSize) + 1;
+      const progress  = 10 + Math.round((i / urls.length) * 80);
+      const checked   = i + batch.length;
+
+      setProg(progress, `Auditing batch ${batchNum}/${totalBatches}`,
+        `Checking ${batch[0].replace(baseUrl,'')||'/'} and ${batch.length - 1} more pages…`);
+
+      try {
+        const batchRes = await apiCall('/api/audit-pages', {
+          urls: batch,
+          siteBaseUrl: baseUrl,
+          checkImages: checkImages && i === 0, // only check image files on first batch
+        });
+        console.log('[audit] batch response keys:', Object.keys(batchRes || {}));
+        if (batchRes.results && batchRes.results.length > 0) {
+          console.log('[audit] batch got', batchRes.results.length, 'pages, first page issues:', batchRes.results[0]?.issues?.length);
+          allResults.push(...batchRes.results);
+          const totalIssues = allResults.reduce((s, p) => s + (p.issues?.length || 0), 0);
+          document.getElementById('ps-checked').textContent = allResults.length;
+          document.getElementById('ps-issues').textContent  = totalIssues;
+        } else if (batchRes.error) {
+          console.error('[audit] batch API error:', batchRes.error);
+        } else {
+          console.warn('[audit] batch returned no results. Full response:', JSON.stringify(batchRes).slice(0, 400));
+        }
+      } catch(e) {
+        console.error('[audit] batch fetch error:', e.message);
+      }
+    }
+
+    // STEP 3: PSI for homepage (if key provided)
+    let homePSI = null;
+    if (psiKey) {
+      setProg(92, 'Fetching PageSpeed scores…', 'Running Lighthouse via PSI API on homepage');
+      homePSI = await fetchPSI(baseUrl, psiKey);
+    }
+
+    setProg(100, 'Audit complete!', '');
+    document.getElementById('prog-icon').textContent = '✅';
+
+    // Build final data
+    const allIssues = allResults.flatMap(p => p.issues || []);
+    auditData = {
+      url: baseUrl,
+      isWordPress,
+      summary: {
+        totalPages:    allResults.length,
+        totalIssues:   allIssues.length,
+        critical:      allIssues.filter(i => i.severity === 'critical').length,
+        high:          allIssues.filter(i => i.severity === 'high').length,
+        medium:        allIssues.filter(i => i.severity === 'medium').length,
+        low:           allIssues.filter(i => i.severity === 'low').length,
+        crawlTime:     Math.round((Date.now() - auditStartTime) / 1000),
+        categories: {
+          SEO:           allIssues.filter(i => i.category === 'SEO').length,
+          Performance:   allIssues.filter(i => i.category === 'Performance').length,
+          Accessibility: allIssues.filter(i => i.category === 'Accessibility').length,
+          Security:      allIssues.filter(i => i.category === 'Security').length,
+          Content:       allIssues.filter(i => i.category === 'Content').length,
+          Tracking:      allIssues.filter(i => i.category === 'Tracking').length,
+        },
+      },
+      robots:  discRes.robots  || {},
+      sitemap: discRes.sitemap || {},
+      psi:     homePSI,
+      pages:   allResults.map(p => ({
+        ...p,
+        issues: (p.issues || []).map(i => ({
+          ...i,
+          category: i.category || i.group || 'Other',
+          severity: i.severity || 'low',
+          title:    i.title    || i.label || '(no title)',
+        }))
+      })),
+    };
+
+    setTimeout(() => {
+      document.getElementById('progress-card').style.display = 'none';
+      document.getElementById('results').style.display = 'block';
+      document.getElementById('status-pill').textContent = 'Complete';
+      document.getElementById('status-pill').className = 'status-pill done';
+      document.getElementById('run-btn').disabled = false;
+      try {
+        renderResults();
+      } catch(renderErr) {
+        console.error('[renderResults] crash:', renderErr.message, renderErr.stack);
+        document.getElementById('issues-list').innerHTML =
+          '<div class="empty-state"><div class="icon">⚠</div>' +
+          '<p style="color:#EF4444;font-size:13px">UI render error: ' + renderErr.message + '</p>' +
+          '<p style="color:#94A3B8;font-size:11px;margin-top:6px">Open DevTools console (F12) for full details</p></div>';
+      }
+    }, 800);
+
+  } catch(e) {
+    const errEl = document.getElementById('err-alert');
+    errEl.textContent = '⚠ ' + e.message;
+    errEl.style.display = 'block';
+    document.getElementById('prog-title').textContent = 'Audit failed';
+    document.getElementById('status-pill').textContent = 'Error';
+    document.getElementById('status-pill').className = 'status-pill';
+    document.getElementById('run-btn').disabled = false;
+  } finally {
+    clearInterval(timerInterval);
+  }
+}
+
+function setProg(pct, title, sub) {
+  document.getElementById('pbar').style.width = pct + '%';
+  document.getElementById('prog-title').textContent = title;
+  document.getElementById('prog-sub').textContent   = sub;
+  document.getElementById('pbar-label').textContent  = pct + '%';
+}
+
+async function apiCall(endpoint, body) {
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(60000),
+  });
+  return res.json();
+}
+
+async function fetchPSI(pageUrl, apiKey) {
+  try {
+    const api = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=' +
+      encodeURIComponent(pageUrl) + '&strategy=mobile&key=' + apiKey +
+      '&category=performance&category=accessibility&category=seo&category=best-practices';
+    const res = await fetch(api, { signal: AbortSignal.timeout(30000) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.lighthouseResult) return null;
+    const cats   = data.lighthouseResult.categories || {};
+    const audits = data.lighthouseResult.audits || {};
+    return {
+      scores: {
+        performance:  Math.round((cats.performance?.score||0)*100),
+        accessibility:Math.round((cats.accessibility?.score||0)*100),
+        seo:          Math.round((cats.seo?.score||0)*100),
+        bestPractices:Math.round((cats['best-practices']?.score||0)*100),
+      },
+      metrics: {
+        fcp:  audits['first-contentful-paint']?.displayValue||'',
+        lcp:  audits['largest-contentful-paint']?.displayValue||'',
+        tbt:  audits['total-blocking-time']?.displayValue||'',
+        cls:  audits['cumulative-layout-shift']?.displayValue||'',
+        si:   audits['speed-index']?.displayValue||'',
+        ttfb: audits['server-response-time']?.displayValue||'',
+      },
+    };
+  } catch { return null; }
+}
+
+// ─── Render ───────────────────────────────────────────────
+function renderResults(shared = false) {
+  if (!auditData) return;
+  const s = auditData.summary;
+  const base = auditData.url;
+
+  // Summary strip
+  document.getElementById('summary-strip').innerHTML = (() => {
+    // FIX: Compute live from pages — summary card always matches filter count
+    const li = (auditData.pages||[]).flatMap(p=>p.issues||[]);
+    const lc = li.filter(i=>i.severity==='critical').length;
+    const lh = li.filter(i=>i.severity==='high').length;
+    const lm = li.filter(i=>i.severity==='medium').length;
+    const ll = li.filter(i=>i.severity==='low').length;
+    return [
+      { v: (auditData.summary||{}).totalPages||0, l: 'Pages',    cls: 'pages' },
+      { v: li.length, l: 'Issues',   cls: 'total' },
+      { v: lc,        l: 'Critical', cls: 'critical' },
+      { v: lh,        l: 'High',     cls: 'high' },
+      { v: lm,        l: 'Medium',   cls: 'medium' },
+      { v: ll,        l: 'Low',      cls: 'low' },
+    ].map(c => '<div class="scard ' + c.cls + '"><div class="sv">' + c.v + '</div><div class="sl">' + c.l + '</div></div>').join('');
+  })();;
+
+  // Builder badge — show detected technology prominently
+  const _homePage = auditData.pages && auditData.pages[0];
+  detectedBuilder = (_homePage && _homePage.meta && _homePage.meta.builder)
+    ? _homePage.meta.builder : { id: 'custom', name: 'Unknown', icon: '⚙️' };
+  const homeBuilder = detectedBuilder;
+  const oldBadge = document.getElementById('builder-badge');
+  if (oldBadge) oldBadge.remove();
+  const bdg = document.createElement('div');
+  bdg.id = 'builder-badge';
+  bdg.className = 'builder-badge ' + (homeBuilder.id || 'custom');
+  bdg.innerHTML = (homeBuilder.icon||'⚙️') + ' Built with <strong>' + (homeBuilder.name||'Unknown') + '</strong> &nbsp;·&nbsp; <span style="font-weight:400;opacity:.7">Fix suggestions are tailored to this builder</span>';
+  document.getElementById('summary-strip').insertAdjacentElement('afterend', bdg);
+
+  // Category row
+  const CAT_ICONS = { SEO:'🔍', Performance:'⚡', Accessibility:'♿', Security:'🔒', Content:'📝', Tracking:'📡', Images:'🖼', Errors:'⚠', Redirects:'↩', Layout:'📐' };
+  // FIX: Compute live from normalised issues
+  const liveCatsR = {};
+  (auditData.pages||[]).flatMap(p=>p.issues||[]).forEach(i => {
+    const g = i.category || i.group || 'Other';
+    liveCatsR[g] = (liveCatsR[g]||0) + 1;
+  });
+  document.getElementById('cat-row').innerHTML = Object.entries(liveCatsR)
+    .filter(([,v]) => v > 0).sort((a,b) => b[1]-a[1])
+    .map(([k,v]) => '<div class="ccat"><div class="ccat-icon">' + (CAT_ICONS[k]||'●') + '</div><div class="ccat-info"><div class="ccat-num">' + v + '</div><div class="ccat-label">' + k + '</div></div></div>')
+    .join('');
+
+  // PSI
+  if (auditData.psi) {
+    document.getElementById('psi-section').style.display = 'block';
+    const sc = auditData.psi.scores;
+    const sc2c = v => v >= 90 ? 'good' : v >= 50 ? 'needs' : 'poor';
+    document.getElementById('psi-grid').innerHTML = [
+      { l:'Performance',    v: sc.performance   },
+      { l:'Accessibility',  v: sc.accessibility },
+      { l:'Best Practices', v: sc.bestPractices },
+      { l:'SEO',            v: sc.seo           },
+    ].map(p => `<div class="psi-card"><div class="psi-score ${sc2c(p.v)}">${p.v}</div><div class="psi-label">${p.l}</div></div>`).join('');
+    const m = auditData.psi.metrics;
+    document.getElementById('psi-metrics').innerHTML = [
+      { l:'FCP', v:m.fcp }, { l:'LCP', v:m.lcp }, { l:'TBT', v:m.tbt },
+      { l:'CLS', v:m.cls }, { l:'SI',  v:m.si  }, { l:'TTFB',v:m.ttfb },
+    ].map(p => `<div class="pmet"><div class="v">${p.v||'—'}</div><div class="l">${p.l}</div></div>`).join('');
+  }
+
+  // Robots + Sitemap
+  renderRobotsSitemap();
+
+  // Tracking
+  const homeTracking = (auditData.pages && auditData.pages[0] && auditData.pages[0].tracking) || {};
+  document.getElementById('tracking-grid').innerHTML = [
+    { l:'GA4',       v: homeTracking.hasGA4   },
+    { l:'GTM',       v: homeTracking.hasGTM   },
+    { l:'UA (dead)', v: homeTracking.hasUA, warn: true },
+    { l:'Meta Pixel',v: homeTracking.hasFBPixel },
+    { l:'TikTok',    v: homeTracking.hasTikTok },
+    { l:'LinkedIn',  v: homeTracking.hasLinkedIn },
+    { l:'Google Ads',v: homeTracking.hasGAds },
+  ].map(t => {
+    const cls = t.warn && t.v ? 'warn' : t.v ? 'yes' : 'no';
+    const icon = t.warn && t.v ? '⚠' : t.v ? '✓' : '✗';
+    return `<span class="tracker ${cls}">${icon} ${t.l}</span>`;
+  }).join('');
+
+  // Images
+  const homeImgs = (auditData.pages && auditData.pages[0] && auditData.pages[0].imageData) || [];
+  if (homeImgs.length > 0) {
+    document.getElementById('img-section').style.display = 'block';
+    const heavy = homeImgs.filter(i => i.sizeKB > 200).length;
+    const noWebP = homeImgs.filter(i => !i.isModern && i.sizeKB > 0).length;
+    document.getElementById('img-summary').textContent =
+      `${homeImgs.length} images · ${heavy} heavy · ${noWebP} non-WebP`;
+
+    document.getElementById('img-tbody').innerHTML = homeImgs.map(img => {
+      const sc = img.sizeKB > 500 ? 'vheavy' : img.sizeKB > 200 ? 'heavy' : 'ok';
+      const sz = img.sizeKB > 0 ? img.sizeKB + ' KB' : '—';
+      const wbp = img.isModern
+        ? '<span class="webp-badge yes">✓ ' + (img.isAvif ? 'AVIF' : 'WebP') + '</span>'
+        : '<span class="webp-badge no">✗ JPG/PNG</span>';
+      const alt  = img.hasAlt  ? '<span class="check-ok">✓</span>' : '<span class="check-bad">✗</span>';
+      const lazy = img.isLazy  ? '<span class="check-ok">✓</span>' : '<span style="color:var(--txt3)">—</span>';
+      const dim  = img.hasDimensions ? '<span class="check-ok">✓</span>' : '<span class="check-bad">✗</span>';
+      return '<tr>' +
+        '<td class="tbl-mono" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + img.src + '">' + img.filename + '</td>' +
+        '<td><span class="size-badge ' + sc + '">' + sz + '</span></td>' +
+        '<td>' + wbp + '</td>' +
+        '<td>' + alt + '</td>' +
+        '<td>' + lazy + '</td>' +
+        '<td>' + dim + '</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  // Pages list in sidebar
+  const allPagesHtml = '<div class="page-item on" id="pg-all-btn" onclick="setPage(\'all\')">' +
+    '<div class="page-dot" style="background:var(--gold)"></div>' +
+    '<span class="page-url">All pages</span>' +
+    '<span class="page-cnt" style="background:rgba(200,151,58,.15);color:var(--gold)">' + auditData.pages.length + '</span>' +
+    '</div>';
+
+  document.getElementById('pages-list').innerHTML = allPagesHtml +
+    auditData.pages.map(p => {
+      const slug = p.url.replace(base, '') || '/';
+      const cnt  = (p.issues || []).length;
+      const hasCrit = (p.issues||[]).some(i => i.severity === 'critical');
+      const dotColor = cnt === 0 ? 'var(--g)' : hasCrit ? 'var(--red)' : 'var(--amber)';
+      const cntBg    = cnt === 0 ? 'rgba(16,185,129,.1);color:var(--g)' : hasCrit ? 'rgba(239,68,68,.1);color:var(--red)' : 'rgba(245,158,11,.1);color:var(--amber)';
+      return '<div class="page-item" data-pg="' + p.url + '" onclick="setPage(\'' + p.url.replace(/'/g,"\\'") + '\')" title="' + p.url + '">' +
+        '<div class="page-dot" style="background:' + dotColor + '"></div>' +
+        '<span class="page-url">' + slug + '</span>' +
+        '<span class="page-cnt" style="background:' + cntBg + '">' + cnt + '</span>' +
+        '</div>';
+    }).join('');
+
+  // Share bar
+  if (!shared) {
+    document.getElementById('share-bar').style.display = 'flex';
+  }
+
+  render();
+}
+
+function renderRobotsSitemap() {
+  const robots  = auditData.robots  || {};
+  const sitemap = auditData.sitemap || {};
+
+  const ri = robots.found
+    ? [
+        ...(robots.issues||[]).map(i => ({ cls:'err',  t: i })),
+        ...(robots.info||[]).map(i  => ({ cls:'warn', t: i })),
+        ...(robots.issues?.length === 0 ? [{ cls:'ok', t: 'robots.txt found and valid ✓' }] : []),
+        { cls: robots.sitemaps?.length ? 'ok' : 'warn', t: `Sitemap directives: ${robots.sitemaps?.length || 0}` },
+      ]
+    : [{ cls:'err', t: (robots.issues||['robots.txt not found'])[0] }];
+
+  const si = sitemap.found
+    ? [
+        { cls:'ok',  t: 'Sitemap found: ' + (sitemap.url||'').split('/').pop() },
+        { cls:'ok',  t: sitemap.urlCount + ' URLs in sitemap' },
+        ...(sitemap.issues||[]).map(i => ({ cls:'err',  t: i })),
+        ...(sitemap.info||[]).map(i  => ({ cls:'warn', t: i })),
+      ]
+    : (sitemap.issues||['Sitemap not found']).map(i => ({ cls:'err', t: i }));
+
+  document.getElementById('rs-grid').innerHTML =
+    '<div class="rs-card">' +
+      '<div class="rs-title">🤖 robots.txt</div>' +
+      ri.map(i => '<div class="rs-item ' + i.cls + '">' + i.t + '</div>').join('') +
+    '</div>' +
+    '<div class="rs-card">' +
+      '<div class="rs-title">🗺 XML Sitemap</div>' +
+      si.map(i => '<div class="rs-item ' + i.cls + '">' + i.t + '</div>').join('') +
+    '</div>';
+}
+
+// ─── Filters ──────────────────────────────────────────────
+function setFilter(type, val) {
+  if (type === 'sev') {
+    filterSev = val;
+    document.querySelectorAll('[data-fsev]').forEach(b => b.classList.toggle('on', b.dataset.fsev === val));
+  } else {
+    filterCat = val;
+    document.querySelectorAll('[data-fcat]').forEach(b => b.classList.toggle('on', b.dataset.fcat === val));
+  }
+  render();
+}
+
+function setPage(url) {
+  filterPage = url;
+  document.querySelectorAll('[data-pg]').forEach(b => b.classList.toggle('on', b.dataset.pg === url));
+  const allBtn = document.getElementById('pg-all-btn');
+  if (allBtn) allBtn.className = 'page-item' + (url === 'all' ? ' on' : '');
+  render();
+}
+
+function render() {
+  if (!auditData) return;
+  const base   = auditData.url;
+  const search = (document.getElementById('sb-search').value || '').toLowerCase();
+
+  // FIX: Normalise issues — handle both 'group' (old) and 'category' (new) field names
+  // Old reports store issues as { group: 'SEO', severity: ... }
+  // New reports store as { category: 'SEO', severity: ... }
+  // Normalising here means filters work on ALL report versions
+  const all = (auditData.pages || []).flatMap(p =>
+    (p.issues || []).map(i => ({
+      ...i,
+      category: i.category || i.group || 'Other',  // normalise group→category
+      severity: i.severity || 'low',                 // ensure severity always exists
+      title:    i.title    || i.label || '(no title)',
+      pageUrl:  p.url,
+    }))
+  );
+  const filtered = all.filter(i => {
+    if (filterPage !== 'all' && i.pageUrl !== filterPage) return false;
+    if (filterSev  !== 'all' && i.severity  !== filterSev)  return false;
+    if (filterCat  !== 'all' && i.category  !== filterCat)  return false;
+    if (search) {
+      const haystack = (i.title + ' ' + (i.detail||'') + ' ' + (i.category||'')).toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+
+  document.getElementById('issues-count').textContent = filtered.length + ' of ' + all.length + ' issues';
+
+  if (filtered.length === 0) {
+    document.getElementById('issues-list').innerHTML =
+      '<div class="empty-state"><div class="icon">' + (all.length === 0 ? '🎉' : '🔍') + '</div><p>' +
+      (all.length === 0 ? 'No issues found on this site!' : 'No issues match the current filters.') +
+      '</p></div>';
+    return;
+  }
+
+  document.getElementById('issues-list').innerHTML = filtered.map((issue, i) => {
+    const shortPage = issue.pageUrl ? issue.pageUrl.replace(base, '') || '/' : '/';
+    const detail = (issue.detail || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const fix    = (issue.fix    || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const loc    = issue.location;
+
+    let locHtml = '';
+    if (loc && (loc.line || loc.selector || loc.context || loc.imageUrl || loc.raw)) {
+      locHtml = '<div class="location-box">' +
+        (loc.line    ? '<div class="loc-row"><span class="loc-key">Line</span><span class="loc-val">' + loc.line + '</span></div>' : '') +
+        (loc.selector ? '<div class="loc-row"><span class="loc-key">Selector</span><span class="loc-val">' + loc.selector.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span></div>' : '') +
+        (loc.context  ? '<div class="loc-row"><span class="loc-key">Context</span><span class="loc-val">' + loc.context.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span></div>' : '') +
+        (loc.imageUrl ? '<div class="loc-row"><span class="loc-key">Image URL</span><span class="loc-val img-url">' + loc.imageUrl.replace(/</g,'&lt;') + '</span></div>' : '') +
+        (loc.raw && loc.raw !== loc.context ? '<div class="loc-row"><span class="loc-key">Raw</span><span class="loc-val">' + loc.raw.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span></div>' : '') +
+      '</div>';
+    }
+
+    return '<div class="issue ' + issue.severity + '" id="ii' + i + '">' +
+      '<div class="issue-hdr" onclick="toggleIssue(' + i + ')">' +
+        '<span class="sev-badge ' + issue.severity + '">' + issue.severity.toUpperCase() + '</span>' +
+        '<span class="cat-badge ' + (issue.category||issue.group||'Other') + '">' + (issue.category||issue.group||'Other') + '</span>' +
+        '<span class="issue-title">' + issue.title + '</span>' +
+        '<span class="issue-page-tag" title="' + (issue.pageUrl||'') + '">' + shortPage + '</span>' +
+        '<span class="issue-arr" id="ia' + i + '">›</span>' +
+      '</div>' +
+      '<div class="issue-body" id="ib' + i + '" style="display:none">' +
+        (detail ? '<div class="issue-detail">' + detail + '</div>' : '') +
+        (fix    ? '<div class="issue-fix">' + (detectedBuilder && detectedBuilder.id && detectedBuilder.id !== 'custom' ? '<span class="fix-builder-note">' + (detectedBuilder.icon||'') + ' ' + (detectedBuilder.name||'') + '</span> ' : '') + '<strong>✅ Fix:</strong> ' + fix + '</div>' : '') +
+        locHtml +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function toggleIssue(i) {
+  const b = document.getElementById('ib' + i);
+  const a = document.getElementById('ia' + i);
+  if (!b) return;
+  const open = b.style.display !== 'none';
+  b.style.display = open ? 'none' : 'block';
+  if (a) a.textContent = open ? '›' : '⌄';
+}
+
+// ─── Share ────────────────────────────────────────────────
+async function saveAndShare() {
+  if (!auditData) return;
+  const btn = document.getElementById('share-save-btn');
+  btn.disabled    = true;
+  btn.textContent = '⏳ Saving…';
+
+  try {
+    const res  = await fetch('/api/save-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ report: auditData }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error);
+
+    currentShareId = data.id;
+    const shareUrl = location.origin + location.pathname + '?report=' + data.id;
+    document.getElementById('share-link-input').value = shareUrl;
+    const now = new Date().toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    document.getElementById('sm-site').textContent  = new URL(auditData.url).hostname;
+    document.getElementById('sm-pages').textContent = auditData.summary.totalPages + ' pages';
+    document.getElementById('sm-issues').textContent= auditData.summary.totalIssues + ' issues';
+    document.getElementById('share-bar').style.display      = 'none';
+    document.getElementById('share-link-box').style.display = 'block';
+    navigator.clipboard.writeText(shareUrl).catch(() => {});
+    window.history.replaceState({}, '', '?report=' + data.id);
+  } catch(e) {
+    alert('Could not save: ' + e.message + '\n\nMake sure BLOB_READ_WRITE_TOKEN is set in Vercel → Environment Variables.');
+    btn.disabled    = false;
+    btn.textContent = '🔗 Generate Share Link';
+  }
+}
+
+function copyLink() {
+  const inp = document.getElementById('share-link-input');
+  const btn = document.getElementById('copy-btn');
+  navigator.clipboard.writeText(inp.value).then(() => {
+    btn.textContent = '✅ Copied!';
+    btn.className   = 'copy-btn copied';
+    setTimeout(() => { btn.textContent = '📋 Copy'; btn.className = 'copy-btn'; }, 2500);
+  }).catch(() => { inp.select(); document.execCommand('copy'); });
+}
+
+// ─── Load shared report ───────────────────────────────────
+async function checkSharedReport() {
+  const id = new URLSearchParams(location.search).get('report');
+  if (!id) return;
+  isSharedView = true;
+  document.getElementById('input-section').style.display = 'none';
+  document.getElementById('progress-card').style.display = 'block';
+  document.getElementById('prog-icon').textContent = '📂';
+  document.getElementById('prog-title').textContent = 'Loading shared report…';
+  document.getElementById('prog-sub').textContent   = 'Fetching saved report data';
+  document.getElementById('pbar').style.width = '60%';
+
+  try {
+    const res  = await fetch('/api/load-report?id=' + encodeURIComponent(id));
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error);
+
+    // Normalise loaded report — handle both old (group) and new (category) formats
+    const loadedReport = data.report;
+    if (loadedReport && loadedReport.pages) {
+      loadedReport.pages.forEach(p => {
+        if (p.issues) {
+          p.issues = p.issues.map(i => ({
+            ...i,
+            category: i.category || i.group || 'Other',
+            severity: i.severity || 'low',
+            title:    i.title    || i.label || '(no title)',
+          }));
+        }
+      });
+      // Recompute summary from normalised data so counts are always accurate
+      const loadedAllIssues = loadedReport.pages.flatMap(p => p.issues || []);
+      loadedReport.summary = {
+        ...loadedReport.summary,
+        totalIssues: loadedAllIssues.length,
+        critical:    loadedAllIssues.filter(i => i.severity === 'critical').length,
+        high:        loadedAllIssues.filter(i => i.severity === 'high').length,
+        medium:      loadedAllIssues.filter(i => i.severity === 'medium').length,
+        low:         loadedAllIssues.filter(i => i.severity === 'low').length,
+      };
+    }
+    auditData = loadedReport;
+    currentShareId = id;
+    const meta    = data.report._meta || {};
+    const saved   = meta.savedAt ? new Date(meta.savedAt).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}) : 'Unknown';
+    document.getElementById('shared-title').textContent = 'Shared Report: ' + (data.report.url || '');
+    document.getElementById('shared-meta').textContent  = `Saved ${saved} · ${data.report.summary?.totalPages||0} pages · ${data.report.summary?.totalIssues||0} issues`;
+    document.getElementById('shared-banner').style.display = 'flex';
+    document.getElementById('progress-card').style.display = 'none';
+    document.getElementById('results').style.display = 'block';
+    document.getElementById('status-pill').textContent = 'Shared Report';
+    document.getElementById('status-pill').className = 'status-pill done';
+    renderResults(true);
+  } catch(e) {
+    const ea = document.getElementById('err-alert');
+    ea.textContent = '⚠ ' + e.message;
+    ea.style.display = 'block';
+    document.getElementById('prog-title').textContent = 'Could not load report';
+  }
+}
+
+function startNewAudit() {
+  window.history.replaceState({}, '', location.pathname);
+  isSharedView = false; auditData = null; currentShareId = null;
+  document.getElementById('shared-banner').style.display = 'none';
+  document.getElementById('results').style.display       = 'none';
+  document.getElementById('input-section').style.display = 'block';
+  document.getElementById('share-bar').style.display     = 'none';
+  document.getElementById('share-link-box').style.display= 'none';
+  document.getElementById('status-pill').textContent = 'Ready';
+  document.getElementById('status-pill').className   = 'status-pill';
+  document.getElementById('pages-list').innerHTML = '<div style="font-size:11px;color:var(--txt3);padding:0 8px">Run an audit to see pages</div>';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ─── Export ───────────────────────────────────────────────
+function exportCSV() {
+  if (!auditData) return;
+  const base = auditData.url;
+  const rows = [['Page','Severity','Category','Issue','Detail','Fix','Line','Selector','Image URL']];
+  auditData.pages.forEach(p => {
+    (p.issues||[]).forEach(i => {
+      const loc = i.location || {};
+      rows.push([
+        p.url.replace(base,'')||'/',
+        i.severity, i.category,
+        i.title.replace(/,/g,';'),
+        (i.detail||'').replace(/,/g,';').replace(/\n/g,' '),
+        (i.fix||'').replace(/,/g,';').replace(/\n/g,' '),
+        loc.line || '',
+        (loc.selector || '').replace(/,/g,';'),
+        (loc.imageUrl || '').replace(/,/g,';'),
+      ]);
+    });
+  });
+  const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(',')).join('\n');
+  dl(csv, 'audit-' + new URL(base).hostname + '-' + Date.now() + '.csv', 'text/csv');
+}
+
+function exportImageCSV() {
+  if (!auditData) return;
+  const rows = [['Page','Filename','Size KB','Format','WebP/AVIF','Alt','Lazy','Dimensions','URL']];
+  auditData.pages.forEach(p => {
+    (p.imageData||[]).forEach(img => rows.push([
+      p.url, img.filename, img.sizeKB,
+      img.isAvif?'AVIF':img.isWebP?'WebP':'JPG/PNG',
+      img.isModern?'Yes':'No',
+      img.hasAlt?'Yes':'No',
+      img.isLazy?'Yes':'No',
+      img.hasDimensions?'Yes':'No',
+      img.src,
+    ]));
+  });
+  const csv = rows.map(r => r.map(c => '"' + String(c||'').replace(/"/g,'""') + '"').join(',')).join('\n');
+  dl(csv, 'images-' + new URL(auditData.url).hostname + '-' + Date.now() + '.csv', 'text/csv');
+}
+
+function printReport() {
+  window.print();
+}
+
+function dl(content, filename, type) {
+  const a = document.createElement('a');
+  a.href = 'data:' + type + ';charset=utf-8,' + encodeURIComponent(content);
+  a.download = filename; a.click();
+}
+
+// Init
+window.addEventListener('DOMContentLoaded', checkSharedReport);
+</script>
+
+</body>
+</html>
